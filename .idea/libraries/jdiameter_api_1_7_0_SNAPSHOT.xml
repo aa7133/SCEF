@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="jdiameter-api-1.7.0-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/jdiameter-api-1.7.0-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
