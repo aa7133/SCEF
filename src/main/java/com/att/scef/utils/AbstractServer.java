@@ -57,7 +57,6 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 	
 
 	public AbstractServer() {
-
 	}
 
 	public void configure(InputStream configInputStream, String dictionaryFile) throws Exception {

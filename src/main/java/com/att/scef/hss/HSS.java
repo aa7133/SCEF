@@ -1,8 +1,6 @@
 package com.att.scef.hss;
 
 import java.io.InputStream;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.jdiameter.api.Answer;
@@ -306,9 +304,6 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 
 			String userData = future.get();
 			
-		} catch (AvpDataException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
