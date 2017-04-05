@@ -1,12 +1,18 @@
 package com.att.scef.hss;
 
 import java.io.InputStream;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import org.jdiameter.api.Answer;
 import org.jdiameter.api.ApplicationId;
 import org.jdiameter.api.Avp;
-import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
@@ -46,32 +52,45 @@ import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationAnswer;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
 import org.jdiameter.client.api.ISessionFactory;
+import org.jdiameter.client.impl.app.s6a.S6aClientSessionImpl;
 import org.jdiameter.common.api.app.s6a.IS6aMessageFactory;
 import org.jdiameter.common.api.app.s6t.IS6tMessageFactory;
+import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataRequestImpl;
 import org.jdiameter.common.impl.app.s6a.S6aSessionFactoryImpl;
 import org.jdiameter.common.impl.app.s6t.JConfigurationInformationAnswerImpl;
+import org.jdiameter.common.impl.app.s6t.JNIDDInformationAnswerImpl;
+import org.jdiameter.common.impl.app.s6t.JReportingInformationRequestImpl;
 import org.jdiameter.common.impl.app.s6t.S6tSessionFactoryImpl;
 import org.jdiameter.server.impl.app.s6a.S6aServerSessionImpl;
+import org.jdiameter.server.impl.app.s6a.ServerS6aSessionDataLocalImpl;
 import org.jdiameter.server.impl.app.s6t.S6tServerSessionImpl;
+
+import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.att.scef.data.ConnectorImpl;
 import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GCommunicationPatternSet;
+import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GUserIdentifier;
 import com.att.scef.utils.AESE_CommunicationPattern;
 import com.att.scef.utils.AbstractServer;
-import com.att.scef.utils.BCDStringConverter;
-import com.att.scef.utils.ExtractTool;
 import com.att.scef.utils.MonitoringEventConfig;
 import com.att.scef.utils.UserIdentifier;
-
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.api.async.RedisStringAsyncCommands;
 import io.lettuce.core.api.sync.RedisStringCommands;
 
-public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener, 
-StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
+public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener,
+                                                   StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
+
+	//protected final Logger logger = LoggerFactory.getLogger(this.getClass());
 
 	private ApplicationId s6aAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777308);
 	private ApplicationId s6tAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777345);
@@ -79,6 +98,7 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 	private S6aSessionFactoryImpl s6aSessionFactory;
 	private S6tSessionFactoryImpl s6tSessionFactory;
 
+	
 	private ConnectorImpl syncDataConnector;
 	private ConnectorImpl asyncDataConnector;
 	private RedisStringAsyncCommands<String, String> asyncHandler;
@@ -92,6 +112,7 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 
 		syncDataConnector = new ConnectorImpl();
 		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(RedisStringCommands.class);
+		logger.info("=================================== HSS started ==============================");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -102,11 +123,13 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 
 		syncDataConnector = new ConnectorImpl();
 		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(RedisStringCommands.class, host, port);
+		logger.info("=================================== HSS started ==============================");
 	}
 
 	public void closedataBases() {
 		syncDataConnector.closeDataBase();
 		asyncDataConnector.closeDataBase();
+		logger.info("=================================== closing data ==============================");
 	}
 	
 	public RedisStringAsyncCommands<String, String> getAsyncHandler() {
@@ -128,6 +151,10 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 	    this.s6tSessionFactory = new S6tSessionFactoryImpl(super.factory);
 	    this.s6tSessionFactory.setServerSessionListener(this);
 	    
+	    
+	    //this.serverS6asession =
+	    //          this.s6aSessionFactory.getNewAppSession(this.s6aSessionFactory.getSessionId("xxTESTxx"), getApplicationId(), ServerS6aSession.class, null); // true...
+
 	    Network network = stack.unwrap(Network.class);
 	    
 	    network.addNetworkReqListener(this, s6aAuthApplicationId);
@@ -188,10 +215,8 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 			}
 			
 		} catch (InternalException e) {
-	        // TODO Auto-generated catch block
 	        e.printStackTrace();
 	    }
-		//TODO remove this
 		return null;
 	}
 
@@ -217,15 +242,33 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 						.append(request.getClass().getName()).toString());
 				return null;
 			}
-			
 		} catch (InternalException e) {
-	        // TODO Auto-generated catch block
 	        e.printStackTrace();
 	    }
 		
-		//TODO remove this
 		return null;
 	}
+	
+	private void sendCIAAnswer(ServerS6tSession session, JConfigurationInformationRequest cir, int resultCode) {
+		try {
+			Answer answer = (Answer) super.createAnswer((Request) cir.getMessage(), resultCode, getS6tAuthApplicationId());
+
+			answer.setError(true);
+			AvpSet set = answer.getAvps();
+
+			session.sendConfigurationInformationAnswer(this.createConfigurationInformationAnswer(answer));
+		} catch (InternalException e) {
+			e.printStackTrace();
+		} catch (IllegalDiameterStateException e) {
+			e.printStackTrace();
+		} catch (RouteException e) {
+			e.printStackTrace();
+		} catch (OverloadException e) {
+			e.printStackTrace();
+		}
+	}
+	
+
 	
 	@Override
 	public void doConfigurationInformationRequestEvent(ServerS6tSession session, JConfigurationInformationRequest cir)
@@ -238,43 +281,20 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 			if (logger.isInfoEnabled()) {
 				logger.info("Configuration-Information-Request (CIR) without User-Identifier parameter");
 			}
-			// we need to return error
-			JConfigurationInformationAnswer cia = new JConfigurationInformationAnswerImpl((Request) cir,
-					ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
-			cia.getMessage().setError(true);
-			cia.getMessage().setRequest(false);
-			cia.getMessage().setProxiable(true);
-			AvpSet set = cia.getMessage().getAvps();
-
-			if (set.getAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID) == null) {
-				AvpSet vendorSpecificApplicationId = set.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false,
-						false);
-				vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getS6tAuthApplicationId().getVendorId(), true);
-				vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getS6tAuthApplicationId().getAuthAppId(),
-						true);/**
-				 * Created by Adi Enzel on 3/23/17.
-				 *
-				 * @author <a href="mailto:aa7133@att.com"> Adi Enzel </a>
-				 */
-
-			}
-			// [ Experimental-Result ]
-			if (set.getAvp(Avp.EXPERIMENTAL_RESULT) == null) {
-				AvpSet experimentalResult = set.addGroupedAvp(Avp.EXPERIMENTAL_RESULT, 0, true, false);
-				experimentalResult.addAvp(Avp.VENDOR_ID, 0);
-				experimentalResult.addAvp(Avp.EXPERIMENTAL_RESULT_CODE, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
-			}
-			// { Auth-Session-State }
-			if (set.getAvp(Avp.AUTH_SESSION_STATE) == null) {
-				set.addAvp(Avp.AUTH_SESSION_STATE, 1);
-			}
-			session.sendConfigurationInformationAnswer(cia);
+			sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
 			return;
 		}
+		
+		GUserIdentifier uid;
+		List<GAESE_CommunicationPattern> aeseComPattern = new ArrayList<GAESE_CommunicationPattern>();
+		List<GMonitoringEventConfig> monitoringEvent = new ArrayList<GMonitoringEventConfig>();;
+
+		JsonParser parser = new JsonParser();
+
 		try {
 			RedisFuture<String> future = null;
 
-			GUserIdentifier uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
+			uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
 
 			if (uid.msisdn != null && uid.msisdn.length() > 0) {
 				future = this.getAsyncHandler().get("HSS-MSISDN-" + uid.msisdn);
@@ -287,28 +307,177 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 				uid.msisdn = this.getSyncHandler().get("HSS-EXT-ID-" + uid.externalId);
 				future = this.getAsyncHandler().get("HSS-MSISDN-" + uid.msisdn);
 			}
+
 			
-			GAESE_CommunicationPattern[] aeseComPattern;
+			CompletableFuture<GHSSUserProfile> gsonFuture = 
+					(CompletableFuture<GHSSUserProfile>)future.thenApply(new Function<String, GHSSUserProfile>() {
+			    @Override
+			    public GHSSUserProfile apply(String value) {
+			        return new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
+			    }
+			});
 
 
 			Avp AESECommPatternAvp = reqSet.getAvp(Avp.AESE_COMMUNICATION_PATTERN);
 			if (AESECommPatternAvp != null)  {
 				aeseComPattern = AESE_CommunicationPattern.extractFromAvp(AESECommPatternAvp);	
 			}
-			
-			GMonitoringEventConfig[] monitoringEvent;
+
 			Avp monitoringEventConfig = reqSet.getAvp(Avp.MONITORING_EVENT_CONFIGURATION);
 			if (monitoringEventConfig != null) {
 				monitoringEvent = MonitoringEventConfig.extractFromAvp(monitoringEventConfig);
 			}
 
-			String userData = future.get();
 			
+			String str;
+			GHSSUserProfile hssData;
+			try {
+				str = future.get(5, TimeUnit.MILLISECONDS);
+				hssData = gsonFuture.get();
+			} catch (TimeoutException e) {
+				hssData = null;
+                str = null;				
+				logger.error("Faild to get message from DB after 5 miliseconds or user not exists");
+				sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+				return;
+			}
+	        
+	        //update new data to HSS
+	        hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent));
+
+	        //update new data to hss
+    		hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
+    		
+    		GsonBuilder builder = new GsonBuilder();
+            // we ignore Private fields
+            builder.excludeFieldsWithModifiers(Modifier.PRIVATE);
+            Gson gson = builder.create();
+    		
+    		RedisFuture<String> setHss = this.getAsyncHandler().set("HSS-MSISDN-" + uid.msisdn,gson.toJson(hssData));
+
+    		// send answer to SCEF
+    		sendCIAAnswer(session, cir, ResultCode.SUCCESS);
+    		
+    		// now we will send update to MME
+    		String mmeAddress = hssData.getMMEAdress();
+    		if (mmeAddress == null || mmeAddress.length() == 0) {
+    			// device is not connected to mme
+    			return;
+    		}
+    		
+    		// we have MME 
+    		// build  IDR message to mme for update user data
+  
+    		Request idr = this.createRequest(session, s6aAuthApplicationId,
+					JInsertSubscriberDataRequest.code, HSS_REALM, 
+					this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(),"aaa://127.0.0.1:23000"));
+	   	    reqSet = idr.getAvps();
+	   	    idr.setRequest(true);
+	   	    
+	   	    // add data
+	   	    //< Insert-Subscriber-Data-Request> ::=		< Diameter Header: 319, REQ, PXY, 16777251 >
+	   	    //< Session-Id > by createRequest
+	   	    //[ DRMP ]
+	   	    //[ Vendor-Specific-Application-Id ] by createRequest
+	   	    //{ Auth-Session-State } by createRequest
+	   	    //{ Origin-Host } by createRequest
+	   	    //{ Origin-Realm } by createRequest
+	   	    //{ Destination-Host }
+	   	    reqSet.addAvp(Avp.DESTINATION_HOST, mmeAddress, true);
+	   	    //{ Destination-Realm }
+	   	    reqSet.addAvp(Avp.DESTINATION_REALM, MME_REALM, true);
+	   	    //{ User-Name }
+	   	    reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
+	   	    //*[ Supported-Features]
+	   	    //{ Subscription-Data}
+	   	    long vndorId = s6tAuthApplicationId.getVendorId();
+	   	    AvpSet userData = reqSet.addGroupedAvp(Avp.SUBSCRIPTION_DATA, vndorId,true, false);
+	   	
+	   	    for (GMonitoringEventConfig mo : hssData.getMonitoringConfig()) {
+	   	    	boolean isRefId = false;
+		   	    AvpSet monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vndorId,true, false);
+		   	    monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vndorId, true, false, true);
+		   	    monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vndorId, true, false);
+
+		   	    if (mo.getScefRefId() != 0) {
+					isRefId = true;
+		   	    	monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID, mo.getScefRefId());
+		   	    }
+	   	    
+		   	    int[] refFordel = mo.getScefRefIdForDelition();
+		   	    if (refFordel != null) {
+					for (int i : refFordel) {
+						isRefId = true;
+						monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+					}
+		   	    }
+
+		   	    if (isRefId == false) {
+		   	    	logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
+		   	    	userData.removeAvp(Avp.MONITORING_EVENT_REPORT);
+		   	    	continue;
+		   	    }
+		   	    monitoringEvCon.addAvp(Avp.MAXIMUM_NUMBER_OF_REPORTS, mo.getMaximumNumberOfReports(), vndorId, true, false);
+	   	    }
+	   	    
+	   	    for (GAESE_CommunicationPattern ae : hssData.getAESECommunicationPattern()) {
+		   	    AvpSet aese = userData.addGroupedAvp(Avp.AESE_COMMUNICATION_PATTERN, vndorId,true, false);
+	   	    	boolean isRefId = false;
+		   	    aese.addAvp(Avp.SCEF_ID, ae.getScefId(), vndorId, true, false, true);
+		   	    if (ae.getScefRefId() != 0) {
+					isRefId = true;
+		   	    	aese.addAvp(Avp.SCEF_REFERENCE_ID, ae.getScefRefId());
+		   	    }
+		   	    int[] refFordel = ae.getScefRefIdForDelition();
+		   	    if (refFordel != null) {
+					for (int i : refFordel) {
+						isRefId = true;
+						aese.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+					}
+		   	    }
+		   	    if (isRefId == false) {
+		   	    	logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
+		   	    	userData.removeAvp(Avp.AESE_COMMUNICATION_PATTERN);
+		   	    	continue;
+		   	    }
+		   	    
+		   	    GCommunicationPatternSet[] cps = ae.getCommunicationPatternSet();
+		   	    if (cps != null) {
+		   	    	for (GCommunicationPatternSet cp : cps) {
+				   	    AvpSet commPattSet = aese.addGroupedAvp(Avp.COMMUNICATION_PATTERN_SET, vndorId,true, false);
+		   	    	    commPattSet.addAvp(Avp.PERIODIC_COMMUNICATION_INDICATOR, cp.periodicCommunicationIndicator);
+		   	    	    if (cp.periodicCommunicationIndicator == 0) {
+		   	    	    	commPattSet.addAvp(Avp.COMMUNICATION_DURATION_TIME, cp.communicationDurationTime);
+		   	    	    	commPattSet.addAvp(Avp.PERIODIC_TIME, cp.periodictime);
+		   	    	    }
+		   	    	}
+		   	    }
+	   	    }
+	   	    
+	   	    //[ IDR- Flags ]
+	   	    //*[ Reset-ID ]
+	   	    //*[ AVP ]
+	   	    //*[ Proxy-Info ]
+	   	    //*[ Route-Record ]
+	   	    
+	   	    JInsertSubscriberDataRequest request = s6aSessionFactory.createInsertSubscriberDataRequest((Request)idr);
+
+	   	    //ISessionFactory sessionFactory = ((ISessionFactory)this.stack.getSessionFactory());
+	   	    //ServerS6aSession serverS6asession = sessionFactory.getNewAppSession(request.getMessage().getSessionId(),
+            //           s6aAuthApplicationId,
+            //           ServerS6aSession.class,
+            //           (Object)request);
+            //serverS6asession.sendInsertSubscriberDataRequest(request);
+
+	   	    ((ServerS6aSession)((ISessionFactory)this.stack.getSessionFactory())
+	   	           .getNewAppSession(request.getMessage().getSessionId(),
+	   	        		             s6aAuthApplicationId,
+	   	        		             ServerS6aSession.class,
+	   	        		             (Object)request))
+	   	           .sendInsertSubscriberDataRequest(request);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -397,38 +566,32 @@ StateChangeListener<AppSession>, IS6aMessageFactory, IS6tMessageFactory{
 
 	@Override
 	public JConfigurationInformationAnswer createConfigurationInformationAnswer(Answer answer) {
-		// TODO Auto-generated method stub
-		return null;
+		return new JConfigurationInformationAnswerImpl(answer);
 	}
 
 	@Override
 	public JConfigurationInformationRequest createConfigurationInformationRequest(Request request) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public JNIDDInformationAnswer createNIDDInformationAnswer(Answer answer) {
-		// TODO Auto-generated method stub
-		return null;
+		return new JNIDDInformationAnswerImpl(answer);
 	}
 
 	@Override
 	public JNIDDInformationRequest createNIDDInformationRequest(Request request) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public JReportingInformationAnswer createReportingInformationAnswer(Answer answer) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public JReportingInformationRequest createReportingInformationRequest(Request request) {
-		// TODO Auto-generated method stub
-		return null;
+		return new JReportingInformationRequestImpl(request);
 	}
 
 	@Override

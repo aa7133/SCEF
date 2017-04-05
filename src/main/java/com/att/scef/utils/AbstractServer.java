@@ -1,7 +1,8 @@
 package com.att.scef.utils;
 
+import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
+
 import java.io.InputStream;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -20,6 +21,7 @@ import org.jdiameter.api.MetaData;
 import org.jdiameter.api.Network;
 import org.jdiameter.api.NetworkReqListener;
 import org.jdiameter.api.Request;
+import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.SessionFactory;
 import org.jdiameter.api.Stack;
 import org.jdiameter.api.StackType;
@@ -55,6 +57,11 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 	private boolean run = true;
 	private String DEFAULT_CONFIG_FILE = "jdiameter-config.xml";
 	
+	private Configuration config;
+	
+	public static final String HSS_REALM = "hss.att.com"; 
+	public static final String MME_REALM = "mme.att.com"; 
+	public static final String SCEF_REALM = "scef.att.com"; 
 
 	public AbstractServer() {
 	}
@@ -92,7 +99,8 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 				is = this.getClass().getClassLoader().getResourceAsStream(configFile);
 			}
 			
-			Configuration config = new XMLConfiguration(is);
+			config = new XMLConfiguration(is);
+			
 			factory = stack.init(config);
 			if (logger.isInfoEnabled()) {
 				logger.info("Stack Configuration successfully loaded.");
@@ -141,6 +149,10 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 		if (logger.isInfoEnabled()) {
 			logger.info("Stack initialization successfully completed.");
 		}
+	}
+	
+	public Configuration getConfiguration() {
+		return this.config;
 	}
 
 	/**
@@ -202,10 +214,21 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 		avps.addAvp(originHost);
 		avps.addAvp(originRealm);
 		
+		avps.addAvp(Avp.AUTH_SESSION_STATE, 1);
+		
 		raw.setProxiable(true);
 		raw.setRequest(false);
+		if (answerCode != ResultCode.SUCCESS) {
+			raw.setError(true);
+			AvpSet experimentalResult = avps.addGroupedAvp(Avp.EXPERIMENTAL_RESULT, 0, true, false);
+			experimentalResult.addAvp(Avp.VENDOR_ID, 0);
+			experimentalResult.addAvp(Avp.EXPERIMENTAL_RESULT_CODE, answerCode);
+		}
+		AvpSet vendorSpecificApplicationId = avps.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+		vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, appId.getVendorId(), true);
+		vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, appId.getAuthAppId(), true);
+		
 		return raw;
-
 	}
 	
 	/**
@@ -217,16 +240,20 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 	 * @param originHost from where
 	 * @return request message
 	 */
-	protected Request createRequest(AppSession session, ApplicationId applicationId, int code,  String realmName, String originHost) {
-		Request r = session.getSessions().get(0).createRequest(code, applicationId, realmName);
+	protected Request createRequest(AppSession session, ApplicationId applicationId, int code,  String originRealmName, String originHost) {
+		Request r = session.getSessions().get(0).createRequest(code, applicationId, originRealmName);
 
 		AvpSet reqSet = r.getAvps();
 		AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
 		vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, applicationId.getVendorId(), true);
 		vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, applicationId.getAuthAppId(), true);
 		reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
+		
 		reqSet.removeAvp(Avp.ORIGIN_HOST);
+		reqSet.removeAvp(Avp.ORIGIN_REALM);
+
 		reqSet.addAvp(Avp.ORIGIN_HOST, originHost, true);
+		reqSet.addAvp(Avp.ORIGIN_REALM, originRealmName, true);
 		return r;
 	}
 
@@ -323,11 +350,13 @@ public abstract class AbstractServer implements NetworkReqListener, EventListene
 
 	// --- State Changes
 	// --------------------------------------------------------
+	@SuppressWarnings("rawtypes")
 	@Override
 	public void stateChanged(Enum oldState, Enum newState) {
 		// NOP
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	public void stateChanged(AppSession source, Enum oldState, Enum newState) {
 		// NOP

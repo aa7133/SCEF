@@ -16,7 +16,7 @@ public class UserIdentifier extends GUserIdentifier {
 			
 			Avp a = set.getAvp(Avp.MSISDN);
 			if (a != null) {
-				uid.msisdn = a.getUTF8String();
+				uid.msisdn = BCDStringConverter.toStringNumber(a.getOctetString());
 			}
 
 			a = set.getAvp(Avp.USER_NAME);

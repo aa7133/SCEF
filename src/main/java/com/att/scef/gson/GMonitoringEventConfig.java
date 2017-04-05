@@ -52,6 +52,95 @@ public class GMonitoringEventConfig {
 	 * IMEISV-CHANGE (1)
 	 */
 	public int associationType = 0;
+
+	public int getScefRefId() {
+		return scefRefId;
+	}
+
+	public void setScefRefId(int scefRefId) {
+		this.scefRefId = scefRefId;
+	}
+
+	public String getScefId() {
+		return scefId;
+	}
+
+	public void setScefId(String scefId) {
+		this.scefId = scefId;
+	}
+
+	public int getMonitoringType() {
+		return monitoringType;
+	}
+
+	public void setMonitoringType(int monitoringType) {
+		this.monitoringType = monitoringType;
+	}
+
+	public int[] getScefRefIdForDelition() {
+		return scefRefIdForDelition;
+	}
+
+	public void setScefRefIdForDelition(int[] scefRefIdForDelition) {
+		this.scefRefIdForDelition = scefRefIdForDelition;
+	}
+
+	public int getMaximumNumberOfReports() {
+		return maximumNumberOfReports;
+	}
+
+	public void setMaximumNumberOfReports(int maximumNumberOfReports) {
+		this.maximumNumberOfReports = maximumNumberOfReports;
+	}
+
+	public String getMonitoringDuration() {
+		return monitoringDuration;
+	}
+
+	public void setMonitoringDuration(String monitoringDuration) {
+		this.monitoringDuration = monitoringDuration;
+	}
+
+	public String getChargedParty() {
+		return chargedParty;
+	}
+
+	public void setChargedParty(String chargedParty) {
+		this.chargedParty = chargedParty;
+	}
+
+	public int getMaximumDetectionTime() {
+		return maximumDetectionTime;
+	}
+
+	public void setMaximumDetectionTime(int maximumDetectionTime) {
+		this.maximumDetectionTime = maximumDetectionTime;
+	}
+
+	public GUEReachabilityConfiguration getUEReachabilityConfiguration() {
+		return UEReachabilityConfiguration;
+	}
+
+	public void setUEReachabilityConfiguration(GUEReachabilityConfiguration uEReachabilityConfiguration) {
+		UEReachabilityConfiguration = uEReachabilityConfiguration;
+	}
+
+	public GLocationInformationConfiguration getLocationInformationConfiguration() {
+		return locationInformationConfiguration;
+	}
+
+	public void setLocationInformationConfiguration(GLocationInformationConfiguration locationInformationConfiguration) {
+		this.locationInformationConfiguration = locationInformationConfiguration;
+	}
+
+	public int getAssociationType() {
+		return associationType;
+	}
+
+	public void setAssociationType(int associationType) {
+		this.associationType = associationType;
+	}
+	
 	
 
 }

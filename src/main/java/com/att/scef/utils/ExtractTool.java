@@ -6,8 +6,6 @@ import java.util.Set;
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
 
-import com.att.scef.gson.GCommunicationPatternSet;
-
 public class ExtractTool {
 
 	

@@ -7,7 +7,6 @@ import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
 
 import com.att.scef.gson.GCommunicationPatternSet;
-import com.att.scef.gson.GScheduledCommunicationTime;
 
 public class CommunicationPatternSet extends GCommunicationPatternSet {
 	
