@@ -1,6 +1,5 @@
 package com.att.scef.utils;
 
-import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
 
 import java.io.InputStream;
 import java.util.Set;

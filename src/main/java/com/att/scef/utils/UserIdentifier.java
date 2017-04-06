@@ -16,19 +16,19 @@ public class UserIdentifier extends GUserIdentifier {
 			
 			Avp a = set.getAvp(Avp.MSISDN);
 			if (a != null) {
-				uid.msisdn = BCDStringConverter.toStringNumber(a.getOctetString());
+				uid.setMsisdn(BCDStringConverter.toStringNumber(a.getOctetString()));
 			}
 
 			a = set.getAvp(Avp.USER_NAME);
 			if (a != null) {
-				uid.userName = a.getUTF8String();
+				uid.setUserName(a.getUTF8String());
 			}
+			
 			a = set.getAvp(Avp.EXTERNAL_IDENTIFIER);
 			if (a != null) {
-				uid.externalId = a.getUTF8String();
+				uid.setExternalId(a.getUTF8String());
 			}
 		} catch (AvpDataException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 

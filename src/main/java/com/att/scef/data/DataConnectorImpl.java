@@ -4,19 +4,22 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 
 public abstract class DataConnectorImpl implements DataConnector {
-	protected RedisClient client;
+	private static RedisClient client = null;
 	private static final String DEFAULT_REDIS_ADDRESS = "redis://localhost/";
 
 	protected DataConnectorImpl(RedisURI uri) {
-        this.client = RedisClient.create(uri);
+		if (client == null) {
+			client = RedisClient.create(uri);
+		}
 	}
 	
 	protected RedisClient getRedisClient() {
-		return this.client;
+		return client;
 	}
 	
 	protected void stop() {
 		client.shutdown();
+		client = null;
 	}
 	
 	public static String getDefaultAddress() {

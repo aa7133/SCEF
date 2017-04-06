@@ -14,7 +14,7 @@
 			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/gson-2.8.0-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-api-1.7.0-SNAPSHOT.jar"/>
-	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-impl-1.7.0-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-api-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/scef/lib/jdiameter-api-1.7.0-SNAPSHOT-sources.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-impl-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/scef/lib/jdiameter-impl-1.7.0-SNAPSHOT-sources.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
