@@ -13,8 +13,11 @@ import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.jdiameter.common.api.app.t6a.IT6aMessageFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class SCEFT6aMessages implements IT6aMessageFactory {
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
 	@Override
 	public JConfigurationInformationRequest createConfigurationInformationRequest(Request request) {

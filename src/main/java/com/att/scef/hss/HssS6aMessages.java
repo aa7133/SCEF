@@ -19,8 +19,11 @@ import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationAnswer;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
 import org.jdiameter.common.api.app.s6a.IS6aMessageFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class HssS6aMessages implements IS6aMessageFactory {
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
 	@Override
 	public JUpdateLocationRequest createUpdateLocationRequest(Request request) {

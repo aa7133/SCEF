@@ -12,8 +12,11 @@ import org.jdiameter.common.api.app.s6t.IS6tMessageFactory;
 import org.jdiameter.common.impl.app.s6t.JConfigurationInformationAnswerImpl;
 import org.jdiameter.common.impl.app.s6t.JNIDDInformationAnswerImpl;
 import org.jdiameter.common.impl.app.s6t.JReportingInformationRequestImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HssS6tMessages implements IS6tMessageFactory {
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
 	@Override
 	public JConfigurationInformationAnswer createConfigurationInformationAnswer(Answer answer) {
@@ -22,6 +25,9 @@ public class HssS6tMessages implements IS6tMessageFactory {
 
 	@Override
 	public JConfigurationInformationRequest createConfigurationInformationRequest(Request request) {
+		if (logger.isErrorEnabled()) {
+			logger.error("S6t Configure-Information-Request (CIR) shuld not be called in this state");
+		}
 		return null;
 	}
 
@@ -32,11 +38,17 @@ public class HssS6tMessages implements IS6tMessageFactory {
 
 	@Override
 	public JNIDDInformationRequest createNIDDInformationRequest(Request request) {
+		if (logger.isErrorEnabled()) {
+			logger.error("S6t NIDD-Information-Request (NIR) shuld not be called in this state");
+		}
 		return null;
 	}
 
 	@Override
 	public JReportingInformationAnswer createReportingInformationAnswer(Answer answer) {
+		if (logger.isErrorEnabled()) {
+			logger.error("S6t Reporting-Information-Answer (RIA) shuld not be called in this state");
+		}
 		return null;
 	}
 
