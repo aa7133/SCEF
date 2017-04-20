@@ -1,8 +1,8 @@
 package com.att.scef.data;
 
-import io.lettuce.core.RedisURI;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.reactive.RedisStringReactiveCommands;
+import com.lambdaworks.redis.RedisURI;
+import com.lambdaworks.redis.api.StatefulRedisConnection;
+import com.lambdaworks.redis.api.rx.RedisStringReactiveCommands;
 
 public class ReactiveDataConnector extends DataConnectorImpl {
 	StatefulRedisConnection<String, String> connection;
@@ -19,7 +19,7 @@ public class ReactiveDataConnector extends DataConnectorImpl {
 	private ReactiveDataConnector(RedisURI uri) {
 		super(uri);
         this.connection = getRedisClient().connect();
-        this.handler = connection.reactive();
+        this.handler = this.connection.reactive();
 	}
 	
 	@Override

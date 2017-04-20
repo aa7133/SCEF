@@ -68,9 +68,9 @@ import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
-import io.lettuce.core.RedisFuture;
-import io.lettuce.core.api.async.RedisStringAsyncCommands;
-import io.lettuce.core.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.RedisFuture;
+import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisStringCommands;
 
 public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener,
                                                    StateChangeListener<AppSession>{

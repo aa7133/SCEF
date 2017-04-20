@@ -42,9 +42,9 @@ import org.jdiameter.server.impl.app.t6a.T6aServerSessionImpl;
 
 import com.att.scef.data.ConnectorImpl;
 import com.att.scef.utils.AbstractServer;
+import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisStringCommands;
 
-import io.lettuce.core.api.async.RedisStringAsyncCommands;
-import io.lettuce.core.api.sync.RedisStringCommands;
 
 public class SCEF extends AbstractServer implements ServerT6aSessionListener, ClientS6tSessionListener,
                                              StateChangeListener<AppSession> {
@@ -93,6 +93,10 @@ public class SCEF extends AbstractServer implements ServerT6aSessionListener, Cl
 		this.setS6tMessages(new SCEFS6tMessages());
 		
 		logger.info("=================================== SCEF started ==============================");
+	}
+	
+	public void sendConfigurationInformationRequest() {
+		
 	}
 	
 	public void closedataBases() {

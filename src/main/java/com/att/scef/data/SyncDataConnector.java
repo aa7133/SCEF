@@ -1,8 +1,8 @@
 package com.att.scef.data;
 
-import io.lettuce.core.RedisURI;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.RedisURI;
+import com.lambdaworks.redis.api.StatefulRedisConnection;
+import com.lambdaworks.redis.api.sync.RedisStringCommands;
 
 public class SyncDataConnector extends DataConnectorImpl  {
 	StatefulRedisConnection<String, String> connection;

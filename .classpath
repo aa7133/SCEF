@@ -4,11 +4,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="/home/odldev/slf4j-1.7.25/slf4j-api/target/slf4j-api-1.7.25.jar" sourcepath="/home/odldev/slf4j-1.7.25/slf4j-api/target/slf4j-api-1.7.25-sources.jar"/>
 	<classpathentry kind="lib" path="/home/odldev/jdiameter/core/mux/jar/target/restcomm-diameter-mux-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/jdiameter/core/mux/jar/src/main"/>
-	<classpathentry kind="lib" path="/home/odldev/scef/lib/lettuce-core-5.0.0.BUILD-20170307.195642-1.jar" sourcepath="/home/odldev/scef/lib/lettuce-core-5.0.0.BUILD-20170307.195642-1-sources.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/lettuce-core-5.0.0.BUILD-20170307.195642-1-javadoc.jar!/"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="lib" path="/home/odldev/scef/lib/gson-2.8.0.jar" sourcepath="/home/odldev/scef/lib/gson-2.8.0-sources.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/gson-2.8.0-javadoc.jar!/"/>
@@ -16,5 +11,15 @@
 	</classpathentry>
 	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-api-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/scef/lib/jdiameter-api-1.7.0-SNAPSHOT-sources.jar"/>
 	<classpathentry kind="lib" path="/home/odldev/scef/lib/jdiameter-impl-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/scef/lib/jdiameter-impl-1.7.0-SNAPSHOT-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="/home/odldev/scef/lib/lettuce-4.4.0-SNAPSHOT.jar" sourcepath="/home/odldev/scef/lib/lettuce-4.4.0-SNAPSHOT-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/lettuce-4.4.0-SNAPSHOT-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/rxjava-1.2.6.jar" sourcepath="/home/odldev/scef/lib/rxjava-1.2.6-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/rxjava-1.2.6-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

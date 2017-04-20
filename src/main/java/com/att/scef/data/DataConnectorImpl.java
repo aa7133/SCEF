@@ -1,7 +1,7 @@
 package com.att.scef.data;
 
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.RedisURI;
+import com.lambdaworks.redis.RedisClient;
+import com.lambdaworks.redis.RedisURI;
 
 public abstract class DataConnectorImpl implements DataConnector {
 	private static RedisClient client = null;
