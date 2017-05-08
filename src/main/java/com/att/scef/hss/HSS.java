@@ -1,6 +1,5 @@
 package com.att.scef.hss;
 
-import java.io.InputStream;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +16,7 @@ import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
+import org.jdiameter.api.Mode;
 import org.jdiameter.api.Network;
 import org.jdiameter.api.OverloadException;
 import org.jdiameter.api.Request;
@@ -51,18 +51,22 @@ import org.jdiameter.common.impl.app.s6a.S6aSessionFactoryImpl;
 import org.jdiameter.common.impl.app.s6t.S6tSessionFactoryImpl;
 import org.jdiameter.server.impl.app.s6a.S6aServerSessionImpl;
 import org.jdiameter.server.impl.app.s6t.S6tServerSessionImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
 
-
+import com.att.scef.data.AsyncDataConnector;
 import com.att.scef.data.ConnectorImpl;
+import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GCommunicationPatternSet;
 import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GUserIdentifier;
+import com.att.scef.interfaces.AbstractServer;
+import com.att.scef.interfaces.S6tServer;
 import com.att.scef.utils.AESE_CommunicationPattern;
-import com.att.scef.utils.AbstractServer;
 import com.att.scef.utils.MonitoringEventConfig;
 import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
@@ -72,10 +76,13 @@ import com.lambdaworks.redis.RedisFuture;
 import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
 import com.lambdaworks.redis.api.sync.RedisStringCommands;
 
-public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener,
-                                                   StateChangeListener<AppSession>{
+//public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener,
+//StateChangeListener<AppSession>{
 
-	//protected final Logger logger = LoggerFactory.getLogger(this.getClass());
+public class HSS {
+
+
+	protected final Logger logger = LoggerFactory.getLogger(HSS.class);
 
 	private ApplicationId s6aAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777308);
 	private ApplicationId s6tAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777345);
@@ -89,35 +96,72 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 	private RedisStringAsyncCommands<String, String> asyncHandler;
 	private RedisStringCommands<String, String> syncHandler;
 	
-	private HssS6aMessages s6aMessages;
-	private HssS6tMessages s6tMessages;
+	
+	private S6tServer s6tServer;
+	private final static String DEFAULT_S6T_SERVER_NAME = "S6t-SERVER";
+	private final static String DEFAULT_T6A_SERVER_NAME = "S6a-Server";
 
-	@SuppressWarnings("unchecked")
-	public HSS() {
-		super();
-		asyncDataConnector = new ConnectorImpl();
-		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(RedisStringAsyncCommands.class);
+ 
+	private final static String DEFAULT_S6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/hss/config-hss-s6a.xml";
+    private final static String DEFAULT_S6T_CONFIG_FILE = "/home/odldev/scef/src/main/resources/hss/config-hss-s6t.xml";
+    private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
 
-		syncDataConnector = new ConnectorImpl();
-		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(RedisStringCommands.class);
-		
-		this.setS6aMessages(new HssS6aMessages());
-		this.setS6tMessages(new HssS6tMessages());
-		
-		logger.info("=================================== HSS started ==============================");
-	}
+
+	   public static void main(String[] args) {
+	    	String s6tConfigFile = DEFAULT_S6T_CONFIG_FILE;
+	    	String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
+	    	String dictionaryFile = DEFAULT_DICTIONARY_FILE;
+	    	String host = "127.0.0.1";
+	    	int port = 6379;
+	    	String channel = "";
+	    	
+	    	
+	    	for (int i = 0; i < args.length; i += 2) {
+	    		if (args[i].equals("--s6t-conf")) {
+	    			s6tConfigFile = args[i+1];
+	    		}
+	    		else if (args[i].equals("--s6a-conf")) {
+	    			s6aConfigFile = args[i+1];
+	    		}
+	    		else if (args[i].equals("--dir")) {
+	    			dictionaryFile = args[i+1];
+	    		}
+	    		else if (args[i].equals("--redis-host")) {
+	    			host = args[i+1];
+	    		}
+	    		else if (args[i].equals("--redis-port")) {
+	    			port = Integer.parseInt(args[i+1]);
+	    		}
+	    		else if (args[i].equals("--redis-channel")) {
+	    			channel = args[i+1];
+	    		}
+	    	}
+	    	
+	    	new HSS(s6tConfigFile, s6aConfigFile, dictionaryFile, host, port, channel);
+	    	
+	    }
+
 	
 	@SuppressWarnings("unchecked")
-	public HSS(String host, int port) {
+	public HSS(String s6tConfigFile, String s6aConfigFile, String dictionaryFile, String host, int port, String channel) {
 		super();
 		asyncDataConnector = new ConnectorImpl();
-		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(RedisStringAsyncCommands.class, host, port);
+		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
 		syncDataConnector = new ConnectorImpl();
-		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(RedisStringCommands.class, host, port);
+		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
 
-		this.setS6aMessages(new HssS6aMessages());
-		this.setS6tMessages(new HssS6tMessages());
+
+		this.s6tServer = new S6tServer(this, s6tConfigFile);
+		
+
+		try {
+			this.s6tServer.init(DEFAULT_S6T_SERVER_NAME);
+            //this.s6tServer.start(Mode.ANY_PEER, 10, TimeUnit.SECONDS);
+            this.s6tServer.start();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		logger.info("=================================== HSS started ==============================");
 	}
@@ -137,20 +181,19 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 	}
 
 
-	
+/*
 	@Override
-	public void configure(InputStream configInputStream, String dictionaryFile) throws Exception {
-		super.configure(configInputStream, dictionaryFile);
+	public void configure(String configFile, String dictionaryFile) throws Exception {
+		super.configure(configFile, dictionaryFile);
+		if (logger.isInfoEnabled()) {
+			logger.info("HSS start configuration ");
+		}
 
 	    this.s6aSessionFactory = new S6aSessionFactoryImpl(super.factory);
 	    this.s6aSessionFactory.setServerSessionListener(this);
 	    this.s6tSessionFactory = new S6tSessionFactoryImpl(super.factory);
 	    this.s6tSessionFactory.setServerSessionListener(this);
 	    
-	    
-	    //this.serverS6asession =
-	    //          this.s6aSessionFactory.getNewAppSession(this.s6aSessionFactory.getSessionId("xxTESTxx"), getApplicationId(), ServerS6aSession.class, null); // true...
-
 	    Network network = stack.unwrap(Network.class);
 	    
 	    network.addNetworkReqListener(this, s6aAuthApplicationId);
@@ -158,8 +201,11 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 
 	    network.addNetworkReqListener(this, s6tAuthApplicationId);
 	    ((ISessionFactory) super.factory).registerAppFacory(ServerS6tSession.class, s6tSessionFactory);
+		if (logger.isInfoEnabled()) {
+			logger.info("HSS end configuration ");
+		}
 	}
-	
+
     @Override
 	public Answer processRequest(Request request) {
 		long appId = request.getApplicationId();
@@ -179,7 +225,8 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 		}
 	}
 
-	private Answer processS6aRequest(Request request, int commandCode) {
+	
+	public Answer processS6aRequest(Request request, int commandCode) {
 		Answer answer = null;
 		try {
 			switch (commandCode) {
@@ -217,55 +264,9 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 		return answer;
 	}
 
-	private Answer processS6tRequest(Request request, int commandCode) {
-		Answer answer = null;
-		try {
-			switch (commandCode) {
-			case JConfigurationInformationRequest.code:
-			case JNIDDInformationRequest.code:
-				S6tServerSessionImpl session = ((ISessionFactory) super.factory).getNewAppSession(request.getSessionId(),
-			            s6tAuthApplicationId, ServerS6tSession.class, (Object)null);
-				session.addStateChangeNotification(this);
-				answer = session.processRequest(request);
-				break;
-			case JReportingInformationRequest.code:
-				logger.error(new StringBuilder("processS6tRequest - : Reporting-Information-Request: Not Supported message in this state: ")
-						.append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return answer;
-			default:
-				logger.error(new StringBuilder("processS6tRequest - Not Supported message: ").append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return null;
-			}
-		} catch (InternalException e) {
-	        e.printStackTrace();
-	    }
-		
-		return answer;
-	}
-	
-	private void sendCIAAnswer(ServerS6tSession session, JConfigurationInformationRequest cir, int resultCode) {
-		try {
-			Answer answer = (Answer) super.createAnswer((Request) cir.getMessage(), resultCode, getS6tAuthApplicationId());
 
-			// for extra avps
-			AvpSet set = answer.getAvps();
-
-			session.sendConfigurationInformationAnswer(this.getS6tMessages().createConfigurationInformationAnswer(answer));
-		} catch (InternalException e) {
-			e.printStackTrace();
-		} catch (IllegalDiameterStateException e) {
-			e.printStackTrace();
-		} catch (RouteException e) {
-			e.printStackTrace();
-		} catch (OverloadException e) {
-			e.printStackTrace();
-		}
-	}
-	
+ 	
+ //TODO need to move to S6aserver
 	private void sendIDRRequest(AppSession session, GHSSUserProfile hssData, String mmeAddress) {
 		// build  IDR message to mme for update user data
 		try {
@@ -325,7 +326,7 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 		}
 
 	}
-
+*/
 	private void buildUserDataAvp(GHSSUserProfile hssData, AvpSet userData, long vendorId) {
    	    for (GMonitoringEventConfig mo : hssData.getMonitoringConfig()) {
    	    	boolean isRefId = false;
@@ -389,9 +390,43 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
    	    }
 		
 	}
-	
-	@Override
-	public void doConfigurationInformationRequestEvent(ServerS6tSession session, JConfigurationInformationRequest cir)
+
+	private String getImsiFromUid(GUserIdentifier uid) {
+		String imsi = null;
+		if (uid.getMsisdn() != null && uid.getMsisdn().length() > 0) {
+			imsi = this.getSyncHandler().get("HSS-MSISDN" + uid.getMsisdn());
+		}
+		else if (uid.getUserName() != null && uid.getUserName().length() > 0) {
+			imsi = this.getSyncHandler().get("HSS-USER-NAME" + uid.getUserName());
+		}
+		else if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
+			imsi = this.getSyncHandler().get("HSS-EXT-ID-" + uid.getExternalId());
+		}
+		return imsi;
+	}
+
+    private void setImsiFromUid(String imsi, GUserIdentifier uid) {
+      String msisdn = uid.getMsisdn();
+      if (imsi == null || imsi.length() == 0) {
+        // we set the MSISDN as IMSI
+        if (msisdn == null || msisdn.length() == 0) {
+          logger.error("no MSISDN");
+          return;
+        }
+        imsi = msisdn;
+      }
+      if (msisdn != null && msisdn.length() != 0) {
+        this.getSyncHandler().set("HSS-MSISDN" + msisdn, imsi);
+      }
+      if (uid.getUserName() != null && uid.getUserName().length() > 0) {
+        this.getSyncHandler().set("HSS-USER-NAME" + uid.getUserName(), imsi);
+      }
+      if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
+        this.getSyncHandler().set("HSS-EXT-ID-" + uid.getExternalId(), imsi);
+      }
+    }
+
+	public void handleConfigurationInformationRequestEvent(ServerS6tSession session, JConfigurationInformationRequest cir)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		if (logger.isInfoEnabled()) {
 			logger.info("Got Configuration Information Request (CIR)");
@@ -403,7 +438,7 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 			if (logger.isInfoEnabled()) {
 				logger.info("Configuration-Information-Request (CIR) without User-Identifier parameter");
 			}
-			sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+			s6tServer.sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
 			return;
 		}
 		
@@ -412,77 +447,63 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 		List<GMonitoringEventConfig> monitoringEvent = new ArrayList<GMonitoringEventConfig>();;
 
 		JsonParser parser = new JsonParser();
+		GHSSUserProfile hssData = null;
 
+		boolean newUser = false;
+		
 		try {
 			RedisFuture<String> future = null;
-
-			String imsi = null;
 			uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
+			String imsi = getImsiFromUid(uid);
 
-			if (uid.getMsisdn() != null && uid.getMsisdn().length() > 0) {
-				imsi = this.getSyncHandler().get("HSS-MSISDN" + uid.getMsisdn());
-			}
-			else if (uid.getUserName() != null && uid.getUserName().length() > 0) {
-				imsi = this.getSyncHandler().get("HSS-USER-NAME" + uid.getUserName());
-			}
-			else if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
-				imsi = this.getSyncHandler().get("HSS-EXT-ID-" + uid.getExternalId());
-			}
-			
 			if (imsi != null) {
 				future = this.getAsyncHandler().get("HSS-IMSI-" + imsi);
 			}
-			else {		s6aMessages = new HssS6aMessages();
-			s6tMessages = new HssS6tMessages();
-
-				logger.error(new StringBuffer("user not found for MSISDN : ")
+			else {
+				logger.error(new StringBuffer("CIR user not found for MSISDN : ")
 						.append(uid.getMsisdn() != null ? uid.getMsisdn() : "NULL")
 						.append(" User Name : ").append(uid.getUserName() != null ? uid.getUserName() : "NULL")
 						.append(" external ID  : ").append(uid.getExternalId() != null ? uid.getExternalId() : "NULL").toString());
-				sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
-				return;
+				setImsiFromUid(null, uid);
+				newUser = true;
+				//s6tServer.sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+				//return;
 			}
-
-			
-			CompletableFuture<GHSSUserProfile> gsonFuture = 
-					(CompletableFuture<GHSSUserProfile>)future.thenApply(new Function<String, GHSSUserProfile>() {
-			    @Override
-			    public GHSSUserProfile apply(String value) {
-			        return new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
-			    }
-			});
-
 
 			Avp AESECommPatternAvp = reqSet.getAvp(Avp.AESE_COMMUNICATION_PATTERN);
 			if (AESECommPatternAvp != null)  {
 				aeseComPattern = AESE_CommunicationPattern.extractFromAvp(AESECommPatternAvp);	
 			}
-
-			Avp monitoringEventConfig = reqSet.getAvp(Avp.MONITORING_EVENT_CONFIGURATION);
+			AvpSet monitoringEventConfig = reqSet.getAvps(Avp.MONITORING_EVENT_CONFIGURATION);
 			if (monitoringEventConfig != null) {
 				monitoringEvent = MonitoringEventConfig.extractFromAvp(monitoringEventConfig);
 			}
 
-			
-			String str;
-			GHSSUserProfile hssData;
-			try {
-				str = future.get(5, TimeUnit.MILLISECONDS);
-				hssData = gsonFuture.get();
-			} catch (TimeoutException e) {
-				hssData = null;
-                str = null;				
-				logger.error("Faild to get message from DB after 5 miliseconds or user not exists");
-				sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
-				return;
+			if (newUser) {
+	          hssData = new GHSSUserProfile();
+			  hssData.setMonitoringConfig((GMonitoringEventConfig[])monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]));
+			  hssData.setAESECommunicationPattern((GAESE_CommunicationPattern[])aeseComPattern.toArray(new GAESE_CommunicationPattern[aeseComPattern.size()]));
 			}
-	        
-	        //update new data to HSS
-	        hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent));
+			else {
+	            logger.info("CIR 4");
+	             CompletableFuture<GHSSUserProfile> gsonFuture = 
+	                    (CompletableFuture<GHSSUserProfile>)future.thenApply(new Function<String, GHSSUserProfile>() {
+	                @Override
+	                public GHSSUserProfile apply(String value) {
+	                    return new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
+	                }
+	              });
 
-	        //update new data to hss
-    		hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
-    		
+	            future.get(5, TimeUnit.MILLISECONDS);
+	            hssData = gsonFuture.get();
+	            //update new data to HSS
+	            hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent));
+
+	            //update new data to hss
+	            hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
+	 		}
+	        
+   		
     		GsonBuilder builder = new GsonBuilder();
             // we ignore Private fields
             builder.excludeFieldsWithModifiers(Modifier.PRIVATE);
@@ -491,70 +512,101 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
     		RedisFuture<String> setHss = this.getAsyncHandler().set("HSS-MSISDN-" + uid.msisdn,gson.toJson(hssData));
 
     		// send answer to SCEF
-    		sendCIAAnswer(session, cir, ResultCode.SUCCESS);
-    		
+    		s6tServer.sendCIAAnswer(session, cir, ResultCode.SUCCESS);
+  		
     		// now we will send update to MME
     		String mmeAddress = hssData.getMMEAdress();
     		if (mmeAddress == null || mmeAddress.length() == 0) {
     			// device is not connected to mme
     			return;
     		}
+            logger.info("CIR 8");
     		
     		// we have MME 
-    		sendIDRRequest(session, hssData, mmeAddress);
-    		
+    		//TODO remove renmarks
+    		//sendIDRRequest(session, hssData, mmeAddress);
 	   	 
 	   	    // finish the asynchronous write
 	   	    setHss.get();
+            logger.info("CIR 9");
 	   	    
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} catch (ExecutionException e) {
 			e.printStackTrace();
+		} catch (TimeoutException e) {
+			hssData = null;
+			logger.error("Faild to get message from DB after 5 miliseconds or user not exists");
+			s6tServer.sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+			return;
 		}
-
 	}
 	
-	@Override
-	public void doNIDDInformationRequestEvent(ServerS6tSession session, JNIDDInformationRequest nir)
+	public void handleNIDDInformationRequestEvent(ServerS6tSession session, JNIDDInformationRequest nir)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
+		if (logger.isInfoEnabled()) {
+			logger.info("Got NIDD Information Request (NIR)");
+		}
+		AvpSet reqSet = nir.getMessage().getAvps();
+
+		Avp userIdentifier = reqSet.getAvp(Avp.USER_IDENTIFIER);
+		if (userIdentifier == null) {
+			if (logger.isInfoEnabled()) {
+				logger.info("NIDD-Information-Request (NIR) without User-Identifier parameter");
+			}
+			s6tServer.sendNIAAnswer(session, nir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+			return;
+		}
+        logger.info("2");
+
+		GUserIdentifier uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
+		String imsi = getImsiFromUid(uid);
+		if (imsi == null) {
+			logger.error(new StringBuffer("NIDD user not found for MSISDN : ")
+					.append(uid.getMsisdn() != null ? uid.getMsisdn() : "NULL")
+					.append(" User Name : ").append(uid.getUserName() != null ? uid.getUserName() : "NULL")
+					.append(" external ID  : ").append(uid.getExternalId() != null ? uid.getExternalId() : "NULL").toString());
+			s6tServer.sendNIAAnswer(session, nir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+			return;
+		}
+        logger.info("3");
 		
+		s6tServer.sendNIAAnswer(session, nir, ResultCode.SUCCESS);
+        logger.info("4");
+
+		if (logger.isInfoEnabled()) {
+			logger.info("NIDD alwayes supported in the current version");
+		}
 	}
 
-	@Override
-	public void doReportingInformationAnswerEvent(ServerS6tSession session, JReportingInformationRequest rir,
+	public void handleReportingInformationAnswerEvent(ServerS6tSession session, JReportingInformationRequest rir,
 			JReportingInformationAnswer ria)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doAuthenticationInformationRequestEvent(ServerS6aSession session, JAuthenticationInformationRequest air)
+	public void handleAuthenticationInformationRequestEvent(ServerS6aSession session, JAuthenticationInformationRequest air)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doCancelLocationAnswerEvent(ServerS6aSession session, JCancelLocationRequest clr,
+	public void handleCancelLocationAnswerEvent(ServerS6aSession session, JCancelLocationRequest clr,
 			JCancelLocationAnswer cla)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doDeleteSubscriberDataAnswerEvent(ServerS6aSession session, JDeleteSubscriberDataRequest dsr,
+	public void handleDeleteSubscriberDataAnswerEvent(ServerS6aSession session, JDeleteSubscriberDataRequest dsr,
 			JDeleteSubscriberDataAnswer dsa)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doInsertSubscriberDataAnswerEvent(ServerS6aSession session, JInsertSubscriberDataRequest idr,
+	public void handleInsertSubscriberDataAnswerEvent(ServerS6aSession session, JInsertSubscriberDataRequest idr,
 			JInsertSubscriberDataAnswer ida)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		if (logger.isInfoEnabled()) {
@@ -715,42 +767,37 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 		
 	}
 
-	@Override
-	public void doNotifyRequestEvent(ServerS6aSession session, JNotifyRequest nor)
+	public void handleNotifyRequestEvent(ServerS6aSession session, JNotifyRequest nor)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doOtherEvent(AppSession appSession, AppRequestEvent applicationRequest, AppAnswerEvent applicationAnswer)
+	public void handleOtherEvent(AppSession appSession, AppRequestEvent applicationRequest, AppAnswerEvent applicationAnswer)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doPurgeUERequestEvent(ServerS6aSession session, JPurgeUERequest pur)
+	public void handlePurgeUERequestEvent(ServerS6aSession session, JPurgeUERequest pur)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doResetAnswerEvent(ServerS6aSession session, JResetRequest rsr, JResetAnswer rsa)
+	public void handleResetAnswerEvent(ServerS6aSession session, JResetRequest rsr, JResetAnswer rsa)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
-	public void doUpdateLocationRequestEvent(ServerS6aSession session, JUpdateLocationRequest ulr)
+	public void handleUpdateLocationRequestEvent(ServerS6aSession session, JUpdateLocationRequest ulr)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		// TODO Auto-generated method stub
 		
 	}
 
-
+/*
 	public ApplicationId getS6aAuthApplicationId() {
 		return s6aAuthApplicationId;
 	}
@@ -776,5 +823,5 @@ public class HSS extends AbstractServer implements ServerS6aSessionListener, Ser
 	}
 	
 	
-
+*/
 }

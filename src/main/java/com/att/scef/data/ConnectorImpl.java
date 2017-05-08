@@ -1,7 +1,7 @@
 package com.att.scef.data;
 
 public class ConnectorImpl {
-	private DataConnector dataBase;
+	private DataConnector dataBase = null;
 	
 	public Object createDatabase(Class<?> clazz, String host, int port) {
 		if (clazz.equals(AsyncDataConnector.class)) {
@@ -16,7 +16,6 @@ public class ConnectorImpl {
 		return dataBase.getHandler();
 	}
 
-	
 	public Object createDatabase(Class<?> clazz) {
 		if (clazz.equals(AsyncDataConnector.class)) {
 			dataBase = new AsyncDataConnector();

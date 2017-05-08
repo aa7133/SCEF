@@ -88,9 +88,9 @@ public class BCDStringConverter {
         if (i != size - 1) { // needs to be only on the last one if size is odd number
           throw new NumberFormatException("Illegal filler in octet n=" + i);
         }
-        else {
-          buf.append(BCD_CHAR[n2]);
-        }
+      }
+      else {
+        buf.append(BCD_CHAR[n2]);
       }
     }
 

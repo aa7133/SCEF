@@ -2,7 +2,6 @@
 <classpath>
 	<classpathentry kind="src" path="src/main/java"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="/home/odldev/slf4j-1.7.25/slf4j-api/target/slf4j-api-1.7.25.jar" sourcepath="/home/odldev/slf4j-1.7.25/slf4j-api/target/slf4j-api-1.7.25-sources.jar"/>
 	<classpathentry kind="lib" path="/home/odldev/jdiameter/core/mux/jar/target/restcomm-diameter-mux-1.7.0-SNAPSHOT.jar" sourcepath="/home/odldev/jdiameter/core/mux/jar/src/main"/>
 	<classpathentry kind="lib" path="/home/odldev/scef/lib/gson-2.8.0.jar" sourcepath="/home/odldev/scef/lib/gson-2.8.0-sources.jar">
 		<attributes>
@@ -21,5 +20,15 @@
 			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/rxjava-1.2.6-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/slf4j-api-1.7.24.jar" sourcepath="/home/odldev/scef/lib/slf4j-api-1.7.24-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/home/odldev/scef/lib/slf4j-api-1.7.24-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/slf4j-simple-1.7.12.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/log4j-1.2.17.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/netty-all-4.0.36.Final.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/picocontainer-2.13.5.jar"/>
+	<classpathentry kind="lib" path="/home/odldev/scef/lib/commons-pool-1.6.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
