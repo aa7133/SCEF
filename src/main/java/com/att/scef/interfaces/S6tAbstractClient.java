@@ -1,17 +1,13 @@
 package com.att.scef.interfaces;
 
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 
 import org.jdiameter.api.ApplicationId;
-import org.jdiameter.api.Avp;
-import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.Mode;
 import org.jdiameter.api.OverloadException;
-import org.jdiameter.api.Request;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -114,25 +110,4 @@ public abstract class S6tAbstractClient extends TBase implements ClientS6tSessio
 	public S6tSessionFactoryImpl getS6tSessionFactory() {
 		return s6tSessionFactory;
 	}
-
-	// ----------- helper
-	protected Request createRequest(AppSession session, int code, String originRealmName, String originHost) {
-		Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), originRealmName);
-      
-		AvpSet reqSet = r.getAvps();
-		AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
-		// 1* [ Vendor-Id ]
-		vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
-		// 0*1{ Auth-Application-Id }
-		vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
-		// 0*1{ Acct-Application-Id }
-		// { Auth-Session-State }
-		reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1); // no session maintiand
-		// { Origin-Host }
-		reqSet.removeAvp(Avp.ORIGIN_HOST);
-		reqSet.addAvp(Avp.ORIGIN_HOST, originHost, true);
-
-		return r;
-	}
-
 }

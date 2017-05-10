@@ -56,6 +56,7 @@ import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.interfaces.AbstractServer;
 import com.att.scef.interfaces.S6tClient;
+import com.att.scef.interfaces.T6aServer;
 import com.att.scef.utils.BCDStringConverter;
 import com.att.scef.utils.MonitoringType;
 import com.google.gson.Gson;
@@ -70,14 +71,6 @@ import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
 public class SCEF {
 
 	protected final Logger logger = LoggerFactory.getLogger(SCEF.class); //this.getClass());
-
-	private ApplicationId t6aAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777346);
-	private ApplicationId s6tAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777345);
-
-	private T6aSessionFactoryImpl t6aSessionFactory;
-
-	private S6tSessionFactoryImpl s6tSessionFactory;
-
  
 	private ConnectorImpl syncDataConnector;
 	private ConnectorImpl asyncDataConnector;
@@ -92,8 +85,8 @@ public class SCEF {
 	
 	private String scefId = null;
 	
-	private final static String DEFAULT_S6T_CLIENT_NAME = "S6T-Client";
-	private final static String DEFAULT_T6A_SERVER_NAME = "T6a-Server";
+	private final static String DEFAULT_S6T_CLIENT_NAME = "S6T-CLIENT";
+	private final static String DEFAULT_T6A_SERVER_NAME = "T6A-SERVER";
 	
 	private final static String DEFAULT_SCEF_ID = "aaa://127.0.0.1:2300";
     private final static String DEFAULT_S6T_CONFIG_FILE = "/home/odldev/scef/src/main/resources/scef/config-scef-s6t.xml";
@@ -101,6 +94,7 @@ public class SCEF {
     private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
 
     private S6tClient s6tClient;
+    private T6aServer t6aServer;
     
 	
     public static void main(String[] args) {
@@ -155,9 +149,13 @@ public class SCEF {
 
 
 		this.s6tClient = new S6tClient(this, s6tConfigFile);
+		this.t6aServer = new T6aServer(this, t6aConfigFile);
 		try {
 			this.s6tClient.init(DEFAULT_S6T_CLIENT_NAME);
 		    this.s6tClient.start(Mode.ANY_PEER, 10, TimeUnit.SECONDS);
+		    
+		    this.t6aServer.init(DEFAULT_T6A_SERVER_NAME);
+		    this.t6aServer.start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -173,6 +171,7 @@ public class SCEF {
 	 * @param msg
 	 */
 	public void sendDiamterMessages(String msg) {
+	    logger.info("sendDiamterMessages");
 		GSCEFUserProfile newMsg = getFormatedMessage(msg);
 		RedisFuture<String> setScefExternId = null;
         RedisFuture<String> setScefMsisdn = null;
@@ -278,13 +277,13 @@ public class SCEF {
 				this.s6tClient.sendCirRequest(newMsg, mc, null);
 			}
 			
-            logger.info("Sending NIDD-Information-Request (CIR)");
+            logger.info("Sending NIDD-Information-Request (NIR)");
             this.s6tClient.sendNirRequest(newMsg);
 
             if (userProfile.getDataQueueAddress() == null || (userProfile.getDataQueueAddress()).length() == 0) {
 				if (newMsg.getDataQueueAddress() != null && newMsg.getDataQueueAddress().length() != 0) {
 					// send NIR
-	                logger.info("Sending NIDD-Information-Request (CIR)");
+	                logger.info("Sending NIDD-Information-Request (NIR)");
 					this.s6tClient.sendNirRequest(newMsg);
 				}
 			}
@@ -329,119 +328,6 @@ public class SCEF {
 		asyncDataConnector.closeDataBase();
 		logger.info("=================================== closing data ==============================");
 	}
-/*	
-	private int sendCirRequest(GMonitoringEventConfig[] mc, GAESE_CommunicationPattern[] cp) {
-		try {
-		  logger.info("sendCirRequest");
-		    ClientS6tSession session = (ClientS6tSession)this.s6tSessionFactory.getNewSession(
-		    		this.stack.getSessionFactory().getSessionId("S6t-"), ClientS6tSession.class, getS6tAuthApplicationId(), null);
-			
-			Request request = this.createRequest(session, this.s6tAuthApplicationId,
-					JConfigurationInformationRequest.code,
-					HSS_REALM,
-					this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:15868"));
-
-			AvpSet reqSet = request.getAvps();
-			if (mc != null && mc.length > 0) {
-				for (GMonitoringEventConfig m : mc) {
-					AvpSet monEvConf = reqSet.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION,
-							this.getS6tAuthApplicationId().getVendorId(),true, false);
-					monEvConf.addAvp(Avp.MONITORING_TYPE, m.getMonitoringType(), this.getS6tAuthApplicationId().getVendorId(), true, false);
-					if (m.getScefRefId() == -1) { // delete
-						for (int i : m.getScefRefIdForDelition()) {
-							monEvConf.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i, this.getS6tAuthApplicationId().getVendorId(), true, false);
-						}
-					}
-					else {
-						monEvConf.addAvp(Avp.SCEF_ID, m.getScefId(), this.getS6tAuthApplicationId().getVendorId(), true, false, false);
-						monEvConf.addAvp(Avp.SCEF_REFERENCE_ID, m.getScefRefId(), this.getS6tAuthApplicationId().getVendorId(), true, false);
-					}
-				}
-			}
-
-			if (cp != null && cp.length > 0) {
-				
-			}
-			
-			// send the message
-			JConfigurationInformationRequest cir = s6tSessionFactory.createConfigurationInformationRequest(request);
-			session.sendConfigurationInformationRequest(cir);
-			
-			if (logger.isInfoEnabled()) {
-				logger.info("Configuration-Information-Request sent to HSS");
-			}
-		} catch (IllegalDiameterStateException e) {
-			e.printStackTrace();
-		} catch (InternalException e) {
-			e.printStackTrace();
-		} catch (RouteException e) {
-			e.printStackTrace();
-		} catch (OverloadException e) {
-			e.printStackTrace();
-		}
-
-		return 0;
-	}
-	
-	private void sendNirRequest(GSCEFUserProfile profile) {
-		try {
-			ISessionFactory sessionFactory = ((ISessionFactory) this.stack.getSessionFactory());
-			ClientS6tSession session = sessionFactory.getNewAppSession(this.getS6tAuthApplicationId(),
-					ClientS6tSession.class);
-
-			Request request = this.createRequest(session, this.s6tAuthApplicationId,
-                    JNIDDInformationRequest.code,
-					HSS_REALM,
-					this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:23000"));
-
-			AvpSet reqSet = request.getAvps();
-			
-			AvpSet userIdentity = reqSet.addGroupedAvp(Avp.USER_IDENTIFIER, this.getS6tAuthApplicationId().getVendorId(), true, false);
-			String userName = profile.getUserName();
-			String externalId = profile.getExternalId();
-			String msisdn = profile.getMsisdn();
-			
-			boolean userFlag = false;
-			
-			if (userName != null && userName.length() != 0) {
-				userIdentity.addAvp(Avp.USER_NAME, userName, this.getS6tAuthApplicationId().getVendorId(), true, false, false);
-				userFlag = true;
-			}
-
-			if (externalId != null && externalId.length() != 0) {
-				userIdentity.addAvp(Avp.EXTERNAL_IDENTIFIER, externalId, this.getS6tAuthApplicationId().getVendorId(), true, false, false);
-				userFlag = true;
-			}
-
-			if (msisdn != null && msisdn.length() != 0) {
-				userIdentity.addAvp(Avp.MSISDN, BCDStringConverter.toBCD(msisdn), this.getS6tAuthApplicationId().getVendorId(), true, false);
-				userFlag = true;
-			}
-
-		    if (userFlag == false) {
-		    	if (logger.isErrorEnabled()) {
-		    		logger.error("No user name, MSISDN or external-id defined for this profile Can't Send NIDD-Information-Request");
-		    	}
-		    	return;
-		    }
-		    
-			JNIDDInformationRequest nir = s6tSessionFactory.createNIDDInformationRequest(request);
-			session.sendNIDDInformationRequest(nir);
-			
-			if (logger.isInfoEnabled()) {
-				logger.info("NIDD-Information-Request sent to HSS");
-			}
-		} catch (IllegalDiameterStateException e) {
-			e.printStackTrace();
-		} catch (InternalException e) {
-			e.printStackTrace();
-		} catch (RouteException e) {
-			e.printStackTrace();
-		} catch (OverloadException e) {
-			e.printStackTrace();
-		}		
-	}
-	*/
 	
 	private GSCEFUserProfile getFormatedMessage(String msg) {
 		GSCEFUserProfile up = new GSCEFUserProfile();
@@ -495,369 +381,9 @@ public class SCEF {
 
 		return up;
 	}
-/*	
-	@Override
-	public void configure(String configFile, String dictionaryFile) throws Exception {
-		super.configure(configFile, dictionaryFile);
-		if (logger.isInfoEnabled()) {
-			logger.info("SCEF start configuration ");
-		}
-
-		//this.setT6aSessionFactory(new T6aSessionFactoryImpl(super.factory));
-	    //this.getT6aSessionFactory().setServerSessionListener(this);
-	    //this.setS6tSessionFactory(new S6tSessionFactoryImpl(super.factory));
-	    //this.getS6tSessionFactory().setClientSessionListener(this);
-	    
-	    Network network = stack.unwrap(Network.class);
-	    
-	    network.addNetworkReqListener(this, s6tAuthApplicationId);
-	    ((ISessionFactory) super.factory).registerAppFacory(ServerS6tSession.class, this.getS6tSessionFactory());
-
-	    network.addNetworkReqListener(this, t6aAuthApplicationId);
-	    ((ISessionFactory) super.factory).registerAppFacory(ServerT6aSession.class, this.getT6aSessionFactory());
-	    
-		if (logger.isInfoEnabled()) {
-			logger.info("SCEF End configuration ");
-		}
-	}
-	
-    @Override
-	public Answer processRequest(Request request) {
-		long appId = request.getApplicationId();
-	
-		int commandCode = request.getCommandCode();
-		if (t6aAuthApplicationId.getAuthAppId() == appId) {
-			return processT6aRequest(request, commandCode);	
-		}
-		else if (s6tAuthApplicationId.getAuthAppId() == appId) {
-			return processS6tRequest(request, commandCode);	
-		}
-		else {
-			logger.error(new StringBuilder("processRequest - Not Supported message: ").append(commandCode)
-					.append(" from interface : ").append(appId)
-					.append(" from Class ").append(request.getClass().getName()).toString());
-			return null;
-		}
-	}
-
-	private Answer processT6aRequest(Request request, int commandCode) {
-		Answer answer = null;
-		T6aServerSessionImpl session = null;
-		try {
-			switch (commandCode) {
-			case org.jdiameter.api.t6a.events.JConfigurationInformationRequest.code:
-				// we may get it if there is support for t6ai not common use
-			case JConnectionManagementRequest.code:
-			case JMO_DataRequest.code:
-			case org.jdiameter.api.t6a.events.JReportingInformationRequest.code:
-				session = ((ISessionFactory) super.factory).getNewAppSession(request.getSessionId(),
-			            t6aAuthApplicationId, ServerT6aSession.class, (Object)null);
-				session.addStateChangeNotification(this);
-				answer = session.processRequest(request);
-				break;
-			case JMT_DataRequest.code:
-				logger.error(new StringBuilder("processT6aRequest - : Mt-Data-Request: Not Supported message in this state: ")
-						.append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return answer;
-			default:
-				logger.error(new StringBuilder("processT6aRequest - Not Supported message: ").append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return null;
-			}
-			
-		} catch (InternalException e) {
-	        e.printStackTrace();
-	    }
-		return answer;
-	}
-
-	private Answer processS6tRequest(Request request, int commandCode) {
-		Answer answer = null;
-		try {
-			switch (commandCode) {
-			case JConfigurationInformationRequest.code:
-				logger.error(new StringBuilder("processS6tRequest - : Configuration-Information-Request: Not Supported message in this state: ")
-						.append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return answer;
-			case JNIDDInformationRequest.code:
-				logger.error(new StringBuilder("processS6tRequest - : NIDD-Information-Request: Not Supported message in this state: ")
-						.append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return answer;
-			case JReportingInformationRequest.code:
-				S6tServerSessionImpl session = ((ISessionFactory) super.factory).getNewAppSession(request.getSessionId(),
-			            s6tAuthApplicationId, ServerS6tSession.class, (Object)null);
-				session.addStateChangeNotification(this);
-				answer = session.processRequest(request);
-				break;
-			default:
-				logger.error(new StringBuilder("processS6tRequest - Not Supported message: ").append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return null;
-			}
-		} catch (InternalException e) {
-	        e.printStackTrace();
-	    }
-		
-		return answer;
-	}
-	*/
-	
-	/** 
-	 * 
-	 */
-	
-	/*
-	@Override
-	public void doConfigurationInformationAnswerEvent(ClientS6tSession session,
-			JConfigurationInformationRequest request, JConfigurationInformationAnswer answer)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		if (logger.isInfoEnabled()) {
-			logger.info("Got S6t - Configuration Information Answer (CIA) from HSS");
-		}
-		// TODO Analyze message
-		StringBuffer str = new StringBuffer("");
-		boolean session_id = false;
-		boolean auth_sessin_state = false;
-		boolean orig_host = false;
-		boolean orig_relm = false;
-		AvpSet set = answer.getMessage().getAvps();
-		Avp avp;
-
-		try {
-			if ((avp = set.getAvp(Avp.RESULT_CODE)) != null) {
-
-			}
-			if ((avp = set.getAvp(Avp.EXPERIMENTAL_RESULT)) != null) {
-				AvpSet a = avp.getGrouped();
-				logger.error(str.append("Got Error : ").append(a.getAvp(Avp.EXPERIMENTAL_RESULT_CODE).getUnsigned32())
-				          .append(" from HSS on CIR request session id : ")
-				          .append(set.getAvp(Avp.SESSION_ID).getUTF8String()).toString());
-				return;
-			}
-			for (Avp a : set) {
-				switch (a.getCode()) {
-				case Avp.SESSION_ID:
-					session_id = true;
-					if (logger.isInfoEnabled()) {
-						str.append("SESSION_ID : ").append(a.getUTF8String()).append("\n");
-					}
-					break;
-				case Avp.DRMP:
-					if (logger.isInfoEnabled()) {
-						str.append("\tDRMP : ").append(a.getUTF8String()).append("\n");
-					}
-					break;
-				case Avp.RESULT_CODE:
-					if (logger.isInfoEnabled()) {
-						str.append("\tRESULT_CODE : ").append(a.getUTF8String()).append("\n");
-					}
-					break;
-				case Avp.EXPERIMENTAL_RESULT:
-					if (logger.isInfoEnabled()) {
-						str.append("\tEXPERIMENTAL_RESULT : ").append(a.getUTF8String()).append("\n");
-					}
-					break;
-				case Avp.AUTH_SESSION_STATE:
-					auth_sessin_state = true;
-					break;
-
-				case Avp.ORIGIN_HOST:
-					orig_host = true;
-					break;
-				case Avp.ORIGIN_REALM:
-					orig_relm = true;
-				case Avp.OC_SUPPORTED_FEATURES:
-					break;
-				case Avp.OC_OLR:
-					break;
-				case Avp.SUPPORTED_FEATURES: // grouped
-					break;
-				case Avp.USER_IDENTIFIER:
-					break;
-				case Avp.MONITORING_EVENT_REPORT: // grouped
-					break;
-				case Avp.MONITORING_EVENT_CONFIG_STATUS: // Grouped
-					break;
-				case Avp.AESE_COMMUNICATION_PATTERN_CONFIG_STATUS: // Grouped
-					break;
-				case Avp.SUPPORTED_SERVICES: // Grouped
-					break;
-				case Avp.S6T_HSS_CAUSE:
-					break;
-				case Avp.FAILED_AVP: // Grouped
-					break;
-				case Avp.PROXY_INFO: // Grouped
-					break;
-				case Avp.ROUTE_RECORD: // Grouped
-					break;
-				default: // got Extra AVP'S
-					break;
-				}
-			}
-		} catch (AvpDataException e) {
-			e.printStackTrace();
-		}
-
-		if (logger.isInfoEnabled()) {
-			logger.info(str.toString());
-		}
-
-		// TODO send message to SCS on the user
-
-	}
-
-	@Override
-	public void doReportingInformationRequestEvent(ClientS6tSession session, JReportingInformationRequest request)
-			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		if (logger.isInfoEnabled()) {
-			logger.info("Got S6t - Reporting Information Request (RIR) from HSS"); 
-		}
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void doNIDDInformationAnswerEvent(ClientS6tSession session, JNIDDInformationRequest request,
-			JNIDDInformationAnswer answer)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		if (logger.isInfoEnabled()) {
-			logger.info("Got S6t - NIDD Information Answer (NIA) from HSS"); 
-		}
-		// TODO get the message
-		
-		// TODO update SCS/ECS on the registration
-		
-		
-	}
-	
-
-	@Override
-	public void doOtherEvent(AppSession session, AppRequestEvent request, AppAnswerEvent answer)
-			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - unknowen event from  MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendConfigurationInformationAnswerEvent(ServerT6aSession session,
-			org.jdiameter.api.t6a.events.JConfigurationInformationRequest request,
-			org.jdiameter.api.t6a.events.JConfigurationInformationAnswer answer)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - Configuration Information Answer (CIA) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendConfigurationInformationRequestEvent(ServerT6aSession session,
-			org.jdiameter.api.t6a.events.JConfigurationInformationRequest request)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - Configuration Information Request (CIR) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendReportingInformationRequestEvent(ServerT6aSession session,
-			org.jdiameter.api.t6a.events.JReportingInformationRequest request)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - Reporting-Information-Answer (RIR) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
-			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - MO-Data-Request (ODR) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
-			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - MT-Data-Answer (TDA) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendConnectionManagementAnswertEvent(ServerT6aSession session, JConnectionManagementRequest request,
-			JConnectionManagementAnswer answer)
-					throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - Connection-Managemet-Answer (CMA) from MME"); 
-		}
-		
-	}
-
-	@Override
-	public void doSendConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
-			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-		// TODO Auto-generated method stub
-		if (logger.isInfoEnabled()) {
-			logger.info("Got T6a - Connection-Managemet-Request (CMR) from MME"); 
-		}
-		
-	}
-	
-	*/
 
 	// setters and getters 
-	public ApplicationId getT6aAuthApplicationId() {
-		return t6aAuthApplicationId;
-	}
 
-	public void setT6aAuthApplicationId(ApplicationId t6aAuthApplicationId) {
-		this.t6aAuthApplicationId = t6aAuthApplicationId;
-	}
-
-	public ApplicationId getS6tAuthApplicationId() {
-		return s6tAuthApplicationId;
-	}
-
-	public void setS6tAuthApplicationId(ApplicationId s6tAuthApplicationId) {
-		this.s6tAuthApplicationId = s6tAuthApplicationId;
-	}
-
-	public T6aSessionFactoryImpl getT6aSessionFactory() {
-		return t6aSessionFactory;
-	}
-
-	public void setT6aSessionFactory(T6aSessionFactoryImpl t6aSessionFactory) {
-		this.t6aSessionFactory = t6aSessionFactory;
-	}
-
-	public S6tSessionFactoryImpl getS6tSessionFactory() {
-		return s6tSessionFactory;
-	}
-
-	public void setS6tSessionFactory(S6tSessionFactoryImpl s6tSessionFactory) {
-		this.s6tSessionFactory = s6tSessionFactory;
-	}
 
 	public ConnectorImpl getSyncDataConnector() {
 		return syncDataConnector;

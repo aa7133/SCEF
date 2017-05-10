@@ -65,6 +65,7 @@ import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GUserIdentifier;
 import com.att.scef.interfaces.AbstractServer;
+import com.att.scef.interfaces.S6aServer;
 import com.att.scef.interfaces.S6tServer;
 import com.att.scef.utils.AESE_CommunicationPattern;
 import com.att.scef.utils.MonitoringEventConfig;
@@ -84,22 +85,17 @@ public class HSS {
 
 	protected final Logger logger = LoggerFactory.getLogger(HSS.class);
 
-	private ApplicationId s6aAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777308);
-	private ApplicationId s6tAuthApplicationId = ApplicationId.createByAuthAppId(10415, 16777345);
-
-	private S6aSessionFactoryImpl s6aSessionFactory;
-	private S6tSessionFactoryImpl s6tSessionFactory;
-
-	
 	private ConnectorImpl syncDataConnector;
 	private ConnectorImpl asyncDataConnector;
 	private RedisStringAsyncCommands<String, String> asyncHandler;
 	private RedisStringCommands<String, String> syncHandler;
 	
 	
-	private S6tServer s6tServer;
+    private S6tServer s6tServer;
+    private S6aServer s6aServer;
+    
 	private final static String DEFAULT_S6T_SERVER_NAME = "S6t-SERVER";
-	private final static String DEFAULT_T6A_SERVER_NAME = "S6a-Server";
+	private final static String DEFAULT_S6A_SERVER_NAME = "S6a-Server";
 
  
 	private final static String DEFAULT_S6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/hss/config-hss-s6a.xml";
@@ -152,13 +148,16 @@ public class HSS {
 		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
 
 
-		this.s6tServer = new S6tServer(this, s6tConfigFile);
+        this.s6tServer = new S6tServer(this, s6tConfigFile);
+        this.s6aServer = new S6aServer(this, s6aConfigFile);
 		
 
 		try {
-			this.s6tServer.init(DEFAULT_S6T_SERVER_NAME);
-            //this.s6tServer.start(Mode.ANY_PEER, 10, TimeUnit.SECONDS);
-            this.s6tServer.start();
+          this.s6tServer.init(DEFAULT_S6T_SERVER_NAME);
+          this.s6tServer.start();
+
+          this.s6aServer.init(DEFAULT_S6A_SERVER_NAME);
+          this.s6aServer.start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -181,215 +180,6 @@ public class HSS {
 	}
 
 
-/*
-	@Override
-	public void configure(String configFile, String dictionaryFile) throws Exception {
-		super.configure(configFile, dictionaryFile);
-		if (logger.isInfoEnabled()) {
-			logger.info("HSS start configuration ");
-		}
-
-	    this.s6aSessionFactory = new S6aSessionFactoryImpl(super.factory);
-	    this.s6aSessionFactory.setServerSessionListener(this);
-	    this.s6tSessionFactory = new S6tSessionFactoryImpl(super.factory);
-	    this.s6tSessionFactory.setServerSessionListener(this);
-	    
-	    Network network = stack.unwrap(Network.class);
-	    
-	    network.addNetworkReqListener(this, s6aAuthApplicationId);
-	    ((ISessionFactory) super.factory).registerAppFacory(ServerS6aSession.class, s6aSessionFactory);
-
-	    network.addNetworkReqListener(this, s6tAuthApplicationId);
-	    ((ISessionFactory) super.factory).registerAppFacory(ServerS6tSession.class, s6tSessionFactory);
-		if (logger.isInfoEnabled()) {
-			logger.info("HSS end configuration ");
-		}
-	}
-
-    @Override
-	public Answer processRequest(Request request) {
-		long appId = request.getApplicationId();
-	
-		int commandCode = request.getCommandCode();
-		if (s6aAuthApplicationId.getAuthAppId() == appId) {
-			return processS6aRequest(request, commandCode);	
-		}
-		else if (s6tAuthApplicationId.getAuthAppId() == appId) {
-			return processS6tRequest(request, commandCode);	
-		}
-		else {
-			logger.error(new StringBuilder("processRequest - Not Supported message: ").append(commandCode)
-					.append(" from interface : ").append(appId)
-					.append(" from Class ").append(request.getClass().getName()).toString());
-			return null;
-		}
-	}
-
-	
-	public Answer processS6aRequest(Request request, int commandCode) {
-		Answer answer = null;
-		try {
-			switch (commandCode) {
-			case JUpdateLocationRequest.code:
-				S6aServerSessionImpl session = ((ISessionFactory) super.factory).getNewAppSession(request.getSessionId(),
-			            s6aAuthApplicationId, ServerS6aSession.class, (Object)null);
-				session.addStateChangeNotification(this);
-				answer = session.processRequest(request);
-				break;
-			case JCancelLocationRequest.code:
-				break;
-			case JAuthenticationInformationRequest.code:
-				break;
-			case JInsertSubscriberDataRequest.code:
-				break;
-			case JDeleteSubscriberDataRequest.code:
-				break;
-			case JPurgeUERequest.code:
-				break;
-			case JResetRequest.code:
-				break;
-			case JNotifyRequest.code:
-				break;
-
-			default:
-				logger.error(new StringBuilder("processS6aRequest - Not Supported message: ").append(commandCode)
-						.append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-						.append(request.getClass().getName()).toString());
-				return null;
-			}
-			
-		} catch (InternalException e) {
-	        e.printStackTrace();
-	    }
-		return answer;
-	}
-
-
- 	
- //TODO need to move to S6aserver
-	private void sendIDRRequest(AppSession session, GHSSUserProfile hssData, String mmeAddress) {
-		// build  IDR message to mme for update user data
-		try {
-			Request idr = this.createRequest(session, this.s6aAuthApplicationId, JInsertSubscriberDataRequest.code,
-					HSS_REALM,
-					this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:23000"));
-			AvpSet reqSet = idr.getAvps();
-			idr.setRequest(true);
-
-			// add data
-			// < Insert-Subscriber-Data-Request> ::= < Diameter Header: 319,
-			// REQ, PXY, 16777251 >
-			// < Session-Id > by createRequest
-			// [ DRMP ]
-			// [ Vendor-Specific-Application-Id ] by createRequest
-			// { Auth-Session-State } by createRequest
-			// { Origin-Host } by createRequest
-			// { Origin-Realm } by createRequest
-			// { Destination-Host }
-			reqSet.addAvp(Avp.DESTINATION_HOST, mmeAddress, true);
-			// { Destination-Realm }
-			reqSet.addAvp(Avp.DESTINATION_REALM, MME_REALM, true);
-			// { User-Name }
-			reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
-			// *[ Supported-Features]
-			// { Subscription-Data}
-
-			buildUserDataAvp(hssData, reqSet.addGroupedAvp(Avp.SUBSCRIPTION_DATA,
-					                 this.s6tAuthApplicationId.getVendorId(), true, false),
-					this.s6tAuthApplicationId.getVendorId());
-
-			// [ IDR- Flags ]
-			// *[ Reset-ID ]
-			// *[ AVP ]
-			// *[ Proxy-Info ]
-			// *[ Route-Record ]
-
-			JInsertSubscriberDataRequest request = this.s6aSessionFactory.createInsertSubscriberDataRequest((Request) idr);
-
-			// ISessionFactory sessionFactory = ((ISessionFactory)this.stack.getSessionFactory());
-			// ServerS6aSession serverS6asession = sessionFactory.getNewAppSession(request.getMessage().getSessionId(),
-			//            s6aAuthApplicationId, ServerS6aSession.class, (Object)request);
-			// serverS6asession.sendInsertSubscriberDataRequest(request);
-
-			// since this is in S6t context we need to create a session for S6a
-			((ServerS6aSession) ((ISessionFactory) this.stack.getSessionFactory()).getNewAppSession(
-					request.getMessage().getSessionId(), this.s6aAuthApplicationId, ServerS6aSession.class,
-					(Object) request)).sendInsertSubscriberDataRequest(request);
-		} catch (InternalException e) {
-			e.printStackTrace();
-		} catch (IllegalDiameterStateException e) {
-			e.printStackTrace();
-		} catch (RouteException e) {
-			e.printStackTrace();
-		} catch (OverloadException e) {
-			e.printStackTrace();
-		}
-
-	}
-*/
-	private void buildUserDataAvp(GHSSUserProfile hssData, AvpSet userData, long vendorId) {
-   	    for (GMonitoringEventConfig mo : hssData.getMonitoringConfig()) {
-   	    	boolean isRefId = false;
-	   	    AvpSet monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
-	   	    monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vendorId, true, false, true);
-	   	    monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vendorId, true, false);
-
-	   	    if (mo.getScefRefId() != 0) {
-				isRefId = true;
-	   	    	monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID, mo.getScefRefId());
-	   	    }
-   	    
-	   	    int[] refFordel = mo.getScefRefIdForDelition();
-	   	    if (refFordel != null) {
-				for (int i : refFordel) {
-					isRefId = true;
-					monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
-				}
-	   	    }
-
-	   	    if (isRefId == false) {
-	   	    	logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
-	   	    	userData.removeAvp(Avp.MONITORING_EVENT_REPORT);
-	   	    	continue;
-	   	    }
-	   	    monitoringEvCon.addAvp(Avp.MAXIMUM_NUMBER_OF_REPORTS, mo.getMaximumNumberOfReports(), vendorId, true, false);
-   	    }
-   	    
-   	    for (GAESE_CommunicationPattern ae : hssData.getAESECommunicationPattern()) {
-	   	    AvpSet aese = userData.addGroupedAvp(Avp.AESE_COMMUNICATION_PATTERN, vendorId,true, false);
-   	    	boolean isRefId = false;
-	   	    aese.addAvp(Avp.SCEF_ID, ae.getScefId(), vendorId, true, false, true);
-	   	    if (ae.getScefRefId() != 0) {
-				isRefId = true;
-	   	    	aese.addAvp(Avp.SCEF_REFERENCE_ID, ae.getScefRefId());
-	   	    }
-	   	    int[] refFordel = ae.getScefRefIdForDelition();
-	   	    if (refFordel != null) {
-				for (int i : refFordel) {
-					isRefId = true;
-					aese.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
-				}
-	   	    }
-	   	    if (isRefId == false) {
-	   	    	logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
-	   	    	userData.removeAvp(Avp.AESE_COMMUNICATION_PATTERN);
-	   	    	continue;
-	   	    }
-	   	    
-	   	    GCommunicationPatternSet[] cps = ae.getCommunicationPatternSet();
-	   	    if (cps != null) {
-	   	    	for (GCommunicationPatternSet cp : cps) {
-			   	    AvpSet commPattSet = aese.addGroupedAvp(Avp.COMMUNICATION_PATTERN_SET, vendorId,true, false);
-	   	    	    commPattSet.addAvp(Avp.PERIODIC_COMMUNICATION_INDICATOR, cp.periodicCommunicationIndicator);
-	   	    	    if (cp.periodicCommunicationIndicator == 0) {
-	   	    	    	commPattSet.addAvp(Avp.COMMUNICATION_DURATION_TIME, cp.communicationDurationTime);
-	   	    	    	commPattSet.addAvp(Avp.PERIODIC_TIME, cp.periodictime);
-	   	    	    }
-	   	    	}
-	   	    }
-   	    }
-		
-	}
 
 	private String getImsiFromUid(GUserIdentifier uid) {
 		String imsi = null;
@@ -405,13 +195,13 @@ public class HSS {
 		return imsi;
 	}
 
-    private void setImsiFromUid(String imsi, GUserIdentifier uid) {
+    private String setImsiFromUid(String imsi, GUserIdentifier uid) {
       String msisdn = uid.getMsisdn();
       if (imsi == null || imsi.length() == 0) {
         // we set the MSISDN as IMSI
         if (msisdn == null || msisdn.length() == 0) {
           logger.error("no MSISDN");
-          return;
+          return null;
         }
         imsi = msisdn;
       }
@@ -424,6 +214,7 @@ public class HSS {
       if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
         this.getSyncHandler().set("HSS-EXT-ID-" + uid.getExternalId(), imsi);
       }
+      return imsi;
     }
 
 	public void handleConfigurationInformationRequestEvent(ServerS6tSession session, JConfigurationInformationRequest cir)
@@ -464,7 +255,7 @@ public class HSS {
 						.append(uid.getMsisdn() != null ? uid.getMsisdn() : "NULL")
 						.append(" User Name : ").append(uid.getUserName() != null ? uid.getUserName() : "NULL")
 						.append(" external ID  : ").append(uid.getExternalId() != null ? uid.getExternalId() : "NULL").toString());
-				setImsiFromUid(null, uid);
+				imsi = setImsiFromUid(null, uid);
 				newUser = true;
 				//s6tServer.sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
 				//return;
@@ -480,27 +271,27 @@ public class HSS {
 			}
 
 			if (newUser) {
+              logger.info("CIR 3");
 	          hssData = new GHSSUserProfile();
 			  hssData.setMonitoringConfig((GMonitoringEventConfig[])monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]));
 			  hssData.setAESECommunicationPattern((GAESE_CommunicationPattern[])aeseComPattern.toArray(new GAESE_CommunicationPattern[aeseComPattern.size()]));
+			  String value = new Gson().toJson(hssData);
+			  String key = "HSS-IMSI-" + imsi;
+			  logger.info("Write to redis Key = " + key + ", Value = " + value);
+			  this.getSyncHandler().set(key, value);
 			}
 			else {
 	            logger.info("CIR 4");
-	             CompletableFuture<GHSSUserProfile> gsonFuture = 
-	                    (CompletableFuture<GHSSUserProfile>)future.thenApply(new Function<String, GHSSUserProfile>() {
-	                @Override
-	                public GHSSUserProfile apply(String value) {
-	                    return new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
-	                }
-	              });
+	            String value = future.get(5, TimeUnit.MILLISECONDS);
+	            hssData = new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
 
-	            future.get(5, TimeUnit.MILLISECONDS);
-	            hssData = gsonFuture.get();
-	            //update new data to HSS
 	            hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent));
 
 	            //update new data to hss
 	            hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
+	            logger.info("Setting the MME address to : " + this.s6aServer.getRemoteRealm());
+	            hssData.setMMEAdress(this.s6aServer.getRemoteRealm());
+                logger.info("CIR 4.1");
 	 		}
 	        
    		
@@ -516,6 +307,9 @@ public class HSS {
   		
     		// now we will send update to MME
     		String mmeAddress = hssData.getMMEAdress();
+    		if (mmeAddress == null) {
+    		  mmeAddress = this.s6aServer.getRemoteRealm();
+    		}
     		if (mmeAddress == null || mmeAddress.length() == 0) {
     			// device is not connected to mme
     			return;
@@ -524,7 +318,7 @@ public class HSS {
     		
     		// we have MME 
     		//TODO remove renmarks
-    		//sendIDRRequest(session, hssData, mmeAddress);
+    		this.s6aServer.sendIDRRequest(session, hssData, mmeAddress);
 	   	 
 	   	    // finish the asynchronous write
 	   	    setHss.get();
@@ -557,8 +351,7 @@ public class HSS {
 			s6tServer.sendNIAAnswer(session, nir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
 			return;
 		}
-        logger.info("2");
-
+ 
 		GUserIdentifier uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
 		String imsi = getImsiFromUid(uid);
 		if (imsi == null) {
@@ -569,10 +362,8 @@ public class HSS {
 			s6tServer.sendNIAAnswer(session, nir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
 			return;
 		}
-        logger.info("3");
 		
 		s6tServer.sendNIAAnswer(session, nir, ResultCode.SUCCESS);
-        logger.info("4");
 
 		if (logger.isInfoEnabled()) {
 			logger.info("NIDD alwayes supported in the current version");
@@ -797,31 +588,4 @@ public class HSS {
 		
 	}
 
-/*
-	public ApplicationId getS6aAuthApplicationId() {
-		return s6aAuthApplicationId;
-	}
-
-	public ApplicationId getS6tAuthApplicationId() {
-		return s6tAuthApplicationId;
-	}
-
-	public HssS6aMessages getS6aMessages() {
-		return s6aMessages;
-	}
-
-	public void setS6aMessages(HssS6aMessages s6aMessages) {
-		this.s6aMessages = s6aMessages;
-	}
-
-	public HssS6tMessages getS6tMessages() {
-		return s6tMessages;
-	}
-
-	public void setS6tMessages(HssS6tMessages s6tMessages) {
-		this.s6tMessages = s6tMessages;
-	}
-	
-	
-*/
 }

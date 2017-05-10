@@ -34,7 +34,7 @@ public class MonitoringType {
   public static int getDeletedMonitoringMap(int oldMap, int newMap) {
 	  return ((oldMap & 0xff) ^ (newMap & 0xff) & oldMap);
   }
-
+  
   public static int getRemaindMonitoringMap(int oldMap, int newMap) {
 	  return ((oldMap & 0xff) & (newMap & 0xff));
   }

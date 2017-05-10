@@ -29,9 +29,16 @@ import org.jdiameter.api.s6a.events.JPurgeUERequest;
 import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
+import org.jdiameter.client.api.ISessionFactory;
+import org.jdiameter.common.api.app.s6a.IS6aSessionFactory;
+import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.att.scef.gson.GAESE_CommunicationPattern;
+import com.att.scef.gson.GCommunicationPatternSet;
+import com.att.scef.gson.GHSSUserProfile;
+import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.hss.HSS;
 
 public class S6aServer extends S6aAbstractServer {
@@ -51,6 +58,142 @@ public class S6aServer extends S6aAbstractServer {
     }
     this.init(new FileInputStream(this.configFile), serverID);
   }
+  
+  private void buildUserDataAvp(GHSSUserProfile hssData, AvpSet userData, long vendorId) {
+    for (GMonitoringEventConfig mo : hssData.getMonitoringConfig()) {
+        boolean isRefId = false;
+        AvpSet monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
+        monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vendorId, true, false, true);
+        monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vendorId, true, false);
+
+        if (mo.getScefRefId() != 0) {
+            isRefId = true;
+            monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID, mo.getScefRefId());
+        }
+    
+        int[] refFordel = mo.getScefRefIdForDelition();
+        if (refFordel != null) {
+            for (int i : refFordel) {
+                isRefId = true;
+                monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+            }
+        }
+
+        if (isRefId == false) {
+            logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
+            userData.removeAvp(Avp.MONITORING_EVENT_REPORT);
+            continue;
+        }
+        monitoringEvCon.addAvp(Avp.MAXIMUM_NUMBER_OF_REPORTS, mo.getMaximumNumberOfReports(), vendorId, true, false);
+    }
+    
+    for (GAESE_CommunicationPattern ae : hssData.getAESECommunicationPattern()) {
+        AvpSet aese = userData.addGroupedAvp(Avp.AESE_COMMUNICATION_PATTERN, vendorId,true, false);
+        boolean isRefId = false;
+        aese.addAvp(Avp.SCEF_ID, ae.getScefId(), vendorId, true, false, true);
+        if (ae.getScefRefId() != 0) {
+            isRefId = true;
+            aese.addAvp(Avp.SCEF_REFERENCE_ID, ae.getScefRefId());
+        }
+        int[] refFordel = ae.getScefRefIdForDelition();
+        if (refFordel != null) {
+            for (int i : refFordel) {
+                isRefId = true;
+                aese.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+            }
+        }
+        if (isRefId == false) {
+            logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
+            userData.removeAvp(Avp.AESE_COMMUNICATION_PATTERN);
+            continue;
+        }
+        
+        GCommunicationPatternSet[] cps = ae.getCommunicationPatternSet();
+        if (cps != null) {
+            for (GCommunicationPatternSet cp : cps) {
+                AvpSet commPattSet = aese.addGroupedAvp(Avp.COMMUNICATION_PATTERN_SET, vendorId,true, false);
+                commPattSet.addAvp(Avp.PERIODIC_COMMUNICATION_INDICATOR, cp.periodicCommunicationIndicator);
+                if (cp.periodicCommunicationIndicator == 0) {
+                    commPattSet.addAvp(Avp.COMMUNICATION_DURATION_TIME, cp.communicationDurationTime);
+                    commPattSet.addAvp(Avp.PERIODIC_TIME, cp.periodictime);
+                }
+            }
+        }
+    }
+    
+}
+
+  
+  public void sendIDRRequest(AppSession session, GHSSUserProfile hssData, String mmeAddress) {
+    // build  IDR message to mme for update user data
+    try {
+      
+      JInsertSubscriberDataRequest idr =
+          new JInsertSubscriberDataRequestImpl(super.createRequest(this.serverS6aSession, JInsertSubscriberDataRequest.code));
+
+      
+      /*
+        Request idr = this.createRequest(session, this.s6aAuthApplicationId, JInsertSubscriberDataRequest.code,
+                HSS_REALM,
+                this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:23000"));
+      */
+        AvpSet reqSet = idr.getMessage().getAvps();
+        //idr.getMessage().setRequest(true);
+
+        // add data
+        // < Insert-Subscriber-Data-Request> ::= < Diameter Header: 319,
+        // REQ, PXY, 16777251 >
+        // < Session-Id > by createRequest
+        // [ DRMP ]
+        // [ Vendor-Specific-Application-Id ] by createRequest
+        // { Auth-Session-State } by createRequest
+        // { Origin-Host } by createRequest
+        // { Origin-Realm } by createRequest
+        // { Destination-Host }
+        reqSet.addAvp(Avp.DESTINATION_HOST, mmeAddress, true);
+        // { Destination-Realm }
+        reqSet.addAvp(Avp.DESTINATION_REALM, this.getRemoteRealm(), true);
+        // { User-Name }
+        reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
+        // *[ Supported-Features]
+        // { Subscription-Data}
+
+        buildUserDataAvp(hssData, reqSet.addGroupedAvp(Avp.SUBSCRIPTION_DATA,
+                                 this.getApplicationId().getVendorId(), true, false),
+                                 this.getApplicationId().getVendorId());
+
+        // [ IDR- Flags ]
+        // *[ Reset-ID ]
+        // *[ AVP ]
+        // *[ Proxy-Info ]
+        // *[ Route-Record ]
+        
+        //JInsertSubscriberDataRequest request = this.s6aSessionFactory.createInsertSubscriberDataRequest((Request) idr);
+
+//        ISessionFactory sessionFactory = ((ISessionFactory)this.stack.getSessionFactory());
+//        ServerS6aSession serverS6asession = sessionFactory.getNewAppSession(request.getMessage().getSessionId(),
+//                   this.getApplicationId(), ServerS6aSession.class, (Object)request);
+//        serverS6asession.sendInsertSubscriberDataRequest(request);
+
+        ((ServerS6aSession) ((ISessionFactory) this.stack.getSessionFactory()).getNewAppSession(
+            //idr.getMessage().getSessionId(), this.getApplicationId(), ServerS6aSession.class,
+            this.stack.getSessionFactory().getSessionId("S6A-IDR"), this.getApplicationId(), ServerS6aSession.class,
+                           (Object) idr)).sendInsertSubscriberDataRequest(idr);
+        
+    } catch (InternalException e) {
+        e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+        e.printStackTrace();
+    } catch (RouteException e) {
+        e.printStackTrace();
+    } catch (OverloadException e) {
+        e.printStackTrace();
+    }
+
+}
+
+  
+  
   
   @Override
   public Answer processRequest(Request request) {

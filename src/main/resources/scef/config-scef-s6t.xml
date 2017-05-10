@@ -6,7 +6,7 @@
     <IPAddresses>
       <IPAddress value="127.0.0.1" />
     </IPAddresses>
-    <Realm value="scef.server.att.com" />
+    <Realm value="s6t.scef.server.att.com" />
     <VendorID value="0" />
     <ProductName value="jDiameter" />
     <FirmwareRevision value="1" />
@@ -43,7 +43,7 @@
       <Peer name="aaa://127.0.0.1:4868" attempt_connect="true" rating="1" />
     </Peers>
     <Realms>
-      <Realm name="hss.server.att.com" peers="127.0.0.1" local_action="LOCAL" dynamic="false" exp_time="1">
+      <Realm name="s6t.hss.server.att.com" peers="127.0.0.1" local_action="LOCAL" dynamic="false" exp_time="1">
         <ApplicationID>
           <VendorId value="10415" />
           <AuthApplId value="16777345" />

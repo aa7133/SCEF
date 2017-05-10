@@ -74,10 +74,11 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 	
 	public static GMonitoringEventConfig extractFromAvpSingle(Avp avp) {
 		GMonitoringEventConfig monEventConfig = new GMonitoringEventConfig();
-		try {
+        Set<Integer> delition = new HashSet<Integer>();
+        try {
 		  monEventConfig.scefId = "";
           monEventConfig.monitoringType = 0;
-		  
+          
 		  for (Avp a: avp.getGrouped()) {
 		    if(a.getCode() == Avp.SCEF_ID) {
               monEventConfig.scefId = a.getDiameterIdentity();
@@ -89,7 +90,7 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
               monEventConfig.monitoringType = a.getInteger32();
 		    }
 		    else if (a.getCode() == Avp.SCEF_REFERENCE_ID_FOR_DELETION) {
-		      monEventConfig.scefRefIdForDelition = ExtractTool.extractFromSCEF_REFERENCE_ID_FOR_DELETION(a);
+		      delition.add(a.getInteger32());
 		    }
 	        else if (a.getCode() == Avp.MAXIMUM_NUMBER_OF_REPORTS) {
 	          monEventConfig.maximumNumberOfReports = a.getInteger32();
@@ -116,6 +117,14 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 		} catch (AvpDataException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+		if (delition.size() != 0) {
+		  int[] d = new int[delition.size()];
+		  int j = 0;
+		  for (int i : delition) {
+		    d[j++] = i;
+		  }
+          monEventConfig.scefRefIdForDelition = d;
 		}
 
 		return monEventConfig;

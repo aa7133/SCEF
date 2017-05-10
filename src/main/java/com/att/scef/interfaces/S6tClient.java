@@ -2,6 +2,8 @@ package com.att.scef.interfaces;
 
 import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
 import static org.jdiameter.client.impl.helpers.Parameters.RealmEntry;
+import static org.jdiameter.client.impl.helpers.Parameters.RealmTable;
+import static org.jdiameter.server.impl.helpers.Parameters.RealmName;
 
 import java.io.FileInputStream;
 
@@ -35,7 +37,7 @@ import com.att.scef.utils.BCDStringConverter;
 public class S6tClient extends S6tAbstractClient {
 	protected final Logger logger = LoggerFactory.getLogger(S6tClient.class);
 	private SCEF scef;
-	public static final String DEFAULT_HSS_REALM = "hss.server.att.com";
+	//private String remoteRealm = null;
 	
 	private String configFile;
 	
@@ -55,14 +57,13 @@ public class S6tClient extends S6tAbstractClient {
       ClientS6tSession session = (ClientS6tSession) this.sessionFactory
           .getNewAppSession(this.getStack().getSessionFactory().getSessionId("S6t-CIR"),
               this.getApplicationId(), ClientS6tSession.class, (Object[]) null);
-
-      String realmName = conf.getStringValue(RealmEntry.ordinal(), DEFAULT_HSS_REALM);
+      
       String localaddr = conf.getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:15868");
       if (logger.isInfoEnabled()) {
-        logger.info(new StringBuilder("target realm = " ).append(realmName).append(", localAddress = ")
+        logger.info(new StringBuilder("target realm = " ).append(this.getRemoteRealm()).append(", localAddress = ")
             .append(localaddr).append(", Session id =").append(session.getSessionId()).toString());
       }
-      Request request = this.createRequest(session, JConfigurationInformationRequest.code, realmName, localaddr);
+      Request request = this.createRequest(session, JConfigurationInformationRequest.code, this.getRemoteRealm(), localaddr);
 
       AvpSet reqSet = request.getAvps();
       // Add user identity 
@@ -126,21 +127,19 @@ public class S6tClient extends S6tAbstractClient {
   public void sendNirRequest(GSCEFUserProfile profile) {
     try {
       Configuration conf = this.getStack().getMetaData().getConfiguration();
-      
-      String realmName = conf.getStringValue(RealmEntry.ordinal(), DEFAULT_HSS_REALM);
-      String localaddr = conf.getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:15868");
 
+      String localaddr = conf.getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:15868");
 
       ClientS6tSession session = (ClientS6tSession)this.sessionFactory
           .getNewAppSession(this.getStack().getSessionFactory().getSessionId("S6t-NIR"),
                   this.getApplicationId(), ClientS6tSession.class, (Object[])null);
 
       if (logger.isInfoEnabled()) {
-        logger.info(new StringBuilder("target realm = " ).append(realmName).append(", localAddress = ")
+        logger.info(new StringBuilder("target realm = " ).append(this.getRemoteRealm()).append(", localAddress = ")
             .append(localaddr).append(", Session id =").append(session.getSessionId()).toString());
       }
       
-      Request request = this.createRequest(session, JNIDDInformationRequest.code, realmName, localaddr);
+      Request request = this.createRequest(session, JNIDDInformationRequest.code, this.getRemoteRealm(), localaddr);
  
       AvpSet reqSet = request.getAvps();
 

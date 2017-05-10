@@ -25,21 +25,25 @@ import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.att.scef.mme.MME;
 import com.att.scef.scef.SCEF;
 
 public class S6aClient extends S6aAbstractClient {
   protected final Logger logger = LoggerFactory.getLogger(S6tClient.class);
 
   private String configFile;
+  private MME mme;
 
-  public S6aClient(String configFile) {
+  public S6aClient(MME mmeCtx, String configFile) {
     //TODO add the MME context
-    // public S6aClient(MME mmeCtx, String configFile) {
-    // this.mme = mmeCtx;
+    this.mme = mmeCtx;
     this.configFile = configFile;
+    logger.info(this.configFile);
   }
   
   public void init(String clientID) throws Exception {
+    logger.info(clientID);
+
     this.init(new FileInputStream(configFile), clientID);
   }
 

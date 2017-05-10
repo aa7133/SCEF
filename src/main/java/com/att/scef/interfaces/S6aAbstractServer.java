@@ -4,10 +4,13 @@ import java.io.FileInputStream;
 import java.util.concurrent.TimeUnit;
 
 import org.jdiameter.api.ApplicationId;
+import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.Mode;
 import org.jdiameter.api.OverloadException;
+import org.jdiameter.api.Request;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -39,7 +42,7 @@ public abstract class S6aAbstractServer extends TBase implements ServerS6aSessio
   protected ServerS6aSession serverS6aSession;
   protected S6aSessionFactoryImpl s6aSessionFactory;
   private static final long VENDOR_ID = 10415;
-  private static final long S6T_AUTH_APPLICATION_ID = 16777345;
+  private static final long S6T_AUTH_APPLICATION_ID = 16777251;
 
   public void init(FileInputStream configStream, String serverId) {
     try {
@@ -66,6 +69,25 @@ public abstract class S6aAbstractServer extends TBase implements ServerS6aSessio
   public void start(Mode mode, long timeOut, TimeUnit timeUnit) throws IllegalDiameterStateException, InternalException {
     stack.start(mode, timeOut, timeUnit);
   }
+  /*
+  protected Request createRequest(AppSession session, int code) {
+    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
+
+    AvpSet reqSet = r.getAvps();
+    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+    // 1* [ Vendor-Id ]
+    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+    // 0*1{ Auth-Application-Id }
+    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    // 0*1{ Acct-Application-Id }
+    // { Auth-Session-State }
+    reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
+    // { Origin-Host }
+    reqSet.removeAvp(Avp.ORIGIN_HOST);
+    reqSet.addAvp(Avp.ORIGIN_HOST, this.getFirstPeerFromList(), true);
+    return r;
+  }
+*/
 
   @Override
   public void doOtherEvent(AppSession session, AppRequestEvent request, AppAnswerEvent answer)

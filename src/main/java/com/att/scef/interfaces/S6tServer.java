@@ -3,15 +3,12 @@ package com.att.scef.interfaces;
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
-import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
-import org.jdiameter.api.Message;
 import org.jdiameter.api.NetworkReqListener;
 import org.jdiameter.api.OverloadException;
 import org.jdiameter.api.Request;
-import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -57,7 +54,9 @@ public class S6tServer extends S6tAbstractServer {
       updateAnswer(cir.getMessage(), answer, resultCode);
       
       AvpSet set = answer.getAvps();
+      
       //TODO
+      //Utils.printMessage(logger, this.getStack().getDictionary(), answer, true);
 
       session.sendConfigurationInformationAnswer(this.s6tSessionFactory.createConfigurationInformationAnswer(answer));
     } catch (InternalException e) {
@@ -80,7 +79,7 @@ public class S6tServer extends S6tAbstractServer {
 
       AvpSet set = answer.getAvps();
       //TODO
-
+ 
       session.sendNIDDInformationAnswer(this.s6tSessionFactory.createNIDDInformationAnswer(answer));
     } catch (InternalException e) {
       e.printStackTrace();
@@ -95,6 +94,7 @@ public class S6tServer extends S6tAbstractServer {
 
   @Override
   public Answer processRequest(Request request) {
+    //logger.info("processRequest");
     int code = request.getCommandCode();
     switch (code) {
     case JConfigurationInformationRequest.code:

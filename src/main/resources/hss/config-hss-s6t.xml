@@ -6,7 +6,7 @@
     <IPAddresses>
       <IPAddress value="127.0.0.1" />
     </IPAddresses>
-    <Realm value="hss.server.att.com" />
+    <Realm value="s6t.hss.server.att.com" />
     <VendorID value="0" />
     <ProductName value="jDiameter" />
     <FirmwareRevision value="1" />
@@ -36,13 +36,13 @@
     <RecTimeOut value="10000" />
     <Concurrent>
       <Entity name="ThreadGroup" size="64"/>
-	  <Entity name="ProcessingMessageTimer" size="1"/>
-	  <Entity name="DuplicationMessageTimer" size="1"/>
-	  <Entity name="RedirectMessageTimer" size="1"/>
-	  <Entity name="PeerOverloadTimer" size="1"/>
-	  <Entity name="ConnectionTimer" size="1"/>
-	  <Entity name="StatisticTimer" size="1"/>
-	  <Entity name="ApplicationSession" size="16"/>
+	    <Entity name="ProcessingMessageTimer" size="1"/>
+	    <Entity name="DuplicationMessageTimer" size="1"/>
+	    <Entity name="RedirectMessageTimer" size="1"/>
+	    <Entity name="PeerOverloadTimer" size="1"/>
+	    <Entity name="ConnectionTimer" size="1"/>
+	    <Entity name="StatisticTimer" size="1"/>
+	    <Entity name="ApplicationSession" size="16"/>
 	</Concurrent>
   </Parameters>
 
@@ -51,7 +51,7 @@
       <Peer	name="aaa://127.0.0.1:5868" attempt_connect="false" rating="1" />
     </Peers>
     <Realms>
-      <Realm name="scef.server.att.com" peers="127.0.0.1" local_action="LOCAL" dynamic="false" exp_time="1">
+      <Realm name="s6t.scef.server.att.com" peers="127.0.0.1" local_action="LOCAL" dynamic="false" exp_time="1">
       	<ApplicationID>
       	  <VendorId value="10415" />
           <AuthApplId value="16777345" />

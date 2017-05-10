@@ -1,5 +1,11 @@
 package com.att.scef.utils;
 
+import static org.jdiameter.client.impl.helpers.Parameters.PeerTable;
+import static org.jdiameter.client.impl.helpers.Parameters.PeerName;
+import static org.jdiameter.client.impl.helpers.Parameters.RealmEntry;
+import static org.jdiameter.client.impl.helpers.Parameters.RealmTable;
+import static org.jdiameter.server.impl.helpers.Parameters.RealmName;
+
 /*
  * JBoss, Home of Professional Open Source
  * Copyright 2011, Red Hat, Inc. and/or its affiliates, and individual
@@ -27,6 +33,7 @@ import org.jdiameter.api.Answer;
 import org.jdiameter.api.ApplicationId;
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpSet;
+import org.jdiameter.api.Configuration;
 import org.jdiameter.api.EventListener;
 import org.jdiameter.api.Message;
 import org.jdiameter.api.NetworkReqListener;
@@ -43,31 +50,16 @@ import org.slf4j.LoggerFactory;
 
 /**
  *
- * @author <a href="mailto:baranowb@gmail.com"> Bartosz Baranowski </a>
  */
 public abstract class TBase implements EventListener<Request, Answer>, NetworkReqListener, StateChangeListener<AppSession> {
   private final Logger logger = LoggerFactory.getLogger(TBase.class);
 
-  protected boolean passed = true;
-
-  // ------- those actually should come from conf... but..
-  protected static final String clientHost = "127.0.0.1";
-  protected static final String clientPort = "13868";
-  protected static final String clientURI = "aaa://" + clientHost + ":" + clientPort;
-
-  protected static final String serverHost = "127.0.0.1";
-  protected static final String serverHost2 = "127.0.0.2";
-  protected static final String serverPortNode1 = "4868";
-  protected static final String serverPortNode2 = "4968";
-  protected static final String serverURINode1 = "aaa://" + serverHost + ":" + serverPortNode1;
-  protected static final String serverURINode2 = "aaa://" + serverHost2 + ":" + serverPortNode2;
-
-  protected static final String serverRealm = "server.mobicents.org";
-  protected static final String clientRealm = "client.mobicents.org";
 
   protected StackCreator stack;
   protected ISessionFactory sessionFactory;
-
+  private String remoteRealm = null;
+  private String[] peers = null;
+  
   protected ApplicationId applicationId;
 
   public void init(InputStream configStream, String clientID, ApplicationId appId) throws Exception {
@@ -75,6 +67,20 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     stack = new StackCreator();
     stack.init(configStream, this, this, clientID, true, appId); // lets always pass
     this.sessionFactory = (ISessionFactory) this.stack.getSessionFactory();
+    Configuration config = stack.getMetaData().getConfiguration();
+    Configuration[] realmTable = config.getChildren(RealmTable.ordinal());
+    for (Configuration t : realmTable) {
+      for (Configuration e : t.getChildren(RealmEntry.ordinal())) {
+        remoteRealm = e.getStringValue(RealmName.ordinal(), "");
+        logger.info("Realm = " + remoteRealm);          
+      }
+    }
+    Configuration[] peersConfig = config.getChildren(PeerTable.ordinal());
+    peers = new String[peersConfig.length];
+    for (int i = 0; i < peersConfig.length; i++) {
+      peers[i] = peersConfig[i].getStringValue(PeerName.ordinal(), null);
+    }
+    
   }
 
   public void updateAnswer(Message req, Message ans, int resultCode) {
@@ -85,7 +91,7 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
 
     AvpSet set = ans.getAvps();
 
-    set.insertAvp(0, Avp.SESSION_ID, req.getSessionId(), false);
+    //set.insertAvp(0, Avp.SESSION_ID, req.getSessionId(), false);
     
     set.addAvp(originHost);
     set.addAvp(originRealm);
@@ -105,26 +111,56 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, this.getApplicationId().getAuthAppId(), true);
   }
 
-  public boolean isPassed() {
-    return passed;
+  // ----------- helper
+  public Request createRequest(AppSession session, int code, String originRealmName, String originHost) {
+    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), originRealmName);
+
+    AvpSet reqSet = r.getAvps();
+    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+    // 1* [ Vendor-Id ]
+    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+    // 0*1{ Auth-Application-Id }
+    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    // 0*1{ Acct-Application-Id }
+    // { Auth-Session-State }
+    reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1); // no session maintiand
+    // { Origin-Host }
+    reqSet.removeAvp(Avp.ORIGIN_HOST);
+    reqSet.addAvp(Avp.ORIGIN_HOST, originHost, true);
+
+    return r;
+  }  
+
+  protected Request createRequest(AppSession session, int code) {
+    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
+
+    AvpSet reqSet = r.getAvps();
+    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+    // 1* [ Vendor-Id ]
+    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+    // 0*1{ Auth-Application-Id }
+    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    // 0*1{ Acct-Application-Id }
+    // { Auth-Session-State }
+    reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
+    // { Origin-Host }
+    reqSet.removeAvp(Avp.ORIGIN_HOST);
+    reqSet.addAvp(Avp.ORIGIN_HOST, this.getFirstPeerFromList(), true);
+    return r;
+  }
+ 
+  public String getRemoteRealm() {
+    return remoteRealm;
   }
 
   public ApplicationId getApplicationId() {
     return applicationId;
   }
-
-  protected String getClientURI() {
-    return clientURI;
+  
+  public String getFirstPeerFromList() {
+    return this.peers[0];
   }
-
-  protected String getServerRealmName() {
-    return serverRealm;
-  }
-
-  protected String getClientRealmName() {
-    return clientRealm;
-  }
-
+  
   public Stack getStack() {
     return this.stack;
   }
@@ -133,13 +169,6 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     return sessionFactory;
   }
   
-  /**
-   * @return
-   */
-  protected String getServerURI() {
-    return serverURINode1;
-  }
-
   // --------- Default Implementation
   // --------- Depending on class it is overridden or by default makes test fail.
   @Override
