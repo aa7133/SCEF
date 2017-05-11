@@ -61,6 +61,9 @@ public class S6aServer extends S6aAbstractServer {
         boolean isRefId = false;
         AvpSet monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
         monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vendorId, true, false, true);
+        
+        logger.info("buildUserDataAvp Monitoring Type = " + mo.getMonitoringType());
+        
         monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vendorId, true, false);
 
         if (mo.getScefRefId() != 0) {
@@ -73,12 +76,14 @@ public class S6aServer extends S6aAbstractServer {
             for (int i : refFordel) {
                 isRefId = true;
                 monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+                logger.info("Monitoring type for delition  = " + i);
+                monitoringEvCon.removeAvp(Avp.SCEF_REFERENCE_ID);
             }
         }
 
         if (isRefId == false) {
             logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
-            userData.removeAvp(Avp.MONITORING_EVENT_REPORT);
+            userData.removeAvp(Avp.MONITORING_EVENT_CONFIGURATION);
             continue;
         }
         monitoringEvCon.addAvp(Avp.MAXIMUM_NUMBER_OF_REPORTS, mo.getMaximumNumberOfReports(), vendorId, true, false);

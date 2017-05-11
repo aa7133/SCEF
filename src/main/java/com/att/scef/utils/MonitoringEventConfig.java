@@ -24,7 +24,8 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 
 		for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
 			if (scefRefidForDelitionList.contains(m.scefRefId)) {
-				continue; // it will be skipped and deleted
+			  
+			  continue; // it will be skipped and deleted
 			}
 
 			if (scefRefIdList.contains(m.scefRefId)) { 
@@ -39,7 +40,13 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 				lm.add(mi);
 			}
 		}
-		return (GMonitoringEventConfig[])lm.toArray();
+		
+		GMonitoringEventConfig[] la = new GMonitoringEventConfig[lm.size()];
+		for (int i = 0; i < lm.size(); i++) {
+		  la[i] = lm.get(i);
+		}
+		  
+		return (la);
 	}
 
 	public static List<Integer> getScefRefIdList(List<GMonitoringEventConfig> list) {
@@ -50,11 +57,18 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 
 	public static List<Integer> getScefRefIdForDelitionList(List<GMonitoringEventConfig> list) {
 		List<Integer> scefRefidForDelitionList = new ArrayList<Integer>();
-		list.stream().forEach((GMonitoringEventConfig x) -> {
-	    	for (int i : x.getScefRefIdForDelition()) {
-	    		scefRefidForDelitionList.add(i);
-	    	}
-	    });
+		if (list == null) {
+		  return null;
+		}
+		for (GMonitoringEventConfig m : list) {
+		  int[] d = m.getScefRefIdForDelition();
+		  if (d == null) {
+		    continue;
+		  }
+		  for (int i : m.getScefRefIdForDelition()) {
+		    scefRefidForDelitionList.add(i);
+		  }
+		}
 		return scefRefidForDelitionList;
 	}
 

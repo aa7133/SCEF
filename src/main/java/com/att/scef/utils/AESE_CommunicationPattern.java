@@ -41,7 +41,14 @@ public class AESE_CommunicationPattern extends GAESE_CommunicationPattern {
 				aese.add(ae);
 			}
 		}
-		return (GAESE_CommunicationPattern[])aese.toArray();
+		
+		GAESE_CommunicationPattern[] g = new GAESE_CommunicationPattern[aese.size()];
+		for (int i = 0; i < aese.size(); i++) {
+		  g[i] = aese.get(i);
+		}
+		
+		
+		return (g);
 	}
 	
 	public static List<Integer> getScefRefIdList(List<GAESE_CommunicationPattern> list) {

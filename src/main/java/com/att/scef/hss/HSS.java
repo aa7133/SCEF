@@ -270,6 +270,9 @@ public class HSS {
 			AvpSet monitoringEventConfig = reqSet.getAvps(Avp.MONITORING_EVENT_CONFIGURATION);
 			if (monitoringEventConfig != null) {
 				monitoringEvent = MonitoringEventConfig.extractFromAvp(monitoringEventConfig);
+				for (GMonitoringEventConfig m : monitoringEvent) {
+				  logger.info("Monitoring Type = " + m.getMonitoringType());
+				}
 			}
 
 			if (newUser) {
@@ -294,7 +297,10 @@ public class HSS {
                 logger.info("CIR 4.1");
 	 		}
 	        
-   		
+            for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
+              logger.info("hss data - Monitoring Type = " + m.getMonitoringType());
+            }
+			
     		GsonBuilder builder = new GsonBuilder();
             // we ignore Private fields
             builder.excludeFieldsWithModifiers(Modifier.PRIVATE);
@@ -314,7 +320,6 @@ public class HSS {
     			// device is not connected to mme
     			return;
     		}
-            logger.info("CIR 8");
     		
     		// we have MME 
     		//TODO remove renmarks
@@ -324,7 +329,6 @@ public class HSS {
     		
 	   	    // finish the asynchronous write
 	   	    setHss.get();
-            logger.info("CIR 9");
 	   	    
 		} catch (InterruptedException e) {
 			e.printStackTrace();
