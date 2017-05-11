@@ -13,6 +13,7 @@ import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
 import org.jdiameter.api.t6a.ClientT6aSession;
+import org.jdiameter.api.t6a.ServerT6aSession;
 import org.jdiameter.api.t6a.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.t6a.events.JConfigurationInformationRequest;
 import org.jdiameter.api.t6a.events.JConnectionManagementAnswer;
@@ -49,50 +50,31 @@ public class T6aClient extends T6aAbstractClient {
     int code = request.getCommandCode();
     switch (code) {
     case JConfigurationInformationRequest.code:
-      if (request.isRequest()) {
-        if (logger.isInfoEnabled()) {
-          logger.info("GOT CIR from SCEF");
-        }
-      }
-      else {
-        logger.info("GOT CIA from SCEF");
-      }
-      logger.error(new StringBuilder("processRequest - T6a : Configuration-Information-Request (CIR): Not yet implemented: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
-      break;
-    case JReportingInformationRequest.code:
-      logger.error(new StringBuilder("processRequest - T6a : Reporting-Information-Answer (RIA): Not yet implemented: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
-      break;
-    case JMO_DataAnswer.code:
-      logger.error(new StringBuilder("processRequest - T6a : MO=Data-Answe (ODR): Not yet implemented: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
-      break;
-    case JMT_DataRequest.code:
-      logger.error(new StringBuilder("processRequest - T6a : MO-Data-Request (TDR): Not yet implemented: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
-      break;
     case JConnectionManagementRequest.code:
       if (request.isRequest()) {
         if (logger.isInfoEnabled()) {
-          logger.info("GOT CMR from SCEF");
+          logger.info("Got Request for command : " + request.getCommandCode());
         }
+        ClientT6aSession clientT6aSession =  (ClientT6aSession)this.t6aSessionFactory
+            .getNewSession(request.getSessionId(), ClientT6aSession.class, this.getApplicationId(), (Object[])null);
+        ((NetworkReqListener)clientT6aSession).processRequest(request);
+        break;
       }
       else {
-        logger.info("GOT CMA from SCEF");
+        if (logger.isInfoEnabled()) {
+          logger.info("Got Answer for command : " + request.getCommandCode());
+        }
+        ServerT6aSession serverT6aSession =  (ServerT6aSession)this.t6aSessionFactory
+            .getNewSession(request.getSessionId(), ServerT6aSession.class, this.getApplicationId(), (Object[])null);
+        ((NetworkReqListener)serverT6aSession).processRequest(request);
+        break;
       }
-      logger.error(new StringBuilder("processRequest - T6a : Connection-Management-Request (CMR): Not yet implemented: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
+    case JReportingInformationRequest.code:
+    case JMO_DataAnswer.code:
+    case JMT_DataRequest.code:
+      ClientT6aSession clientT6aSession =  (ClientT6aSession)this.t6aSessionFactory
+          .getNewSession(request.getSessionId(), ClientT6aSession.class, this.getApplicationId(), (Object[])null);
+      ((NetworkReqListener)clientT6aSession).processRequest(request);
       break;
     default:
       logger.error(new StringBuilder("processRequest - T6a - Not Supported message: ").append(request.getCommandCode())

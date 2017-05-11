@@ -440,5 +440,156 @@ public class SCEF {
 		return scefId;
 	}
 	
-	
+  public void handleOtherEvent(AppSession session, AppRequestEvent request, AppAnswerEvent answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error(
+        "Received \"S6t Other\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
+  }
+
+  public void handleConfigurationInformationAnswerEvent(ClientS6tSession session,
+      JConfigurationInformationRequest request, JConfigurationInformationAnswer answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+
+    StringBuffer str = new StringBuffer("");
+    boolean session_id = false;
+    boolean auth_sessin_state = false;
+    boolean orig_host = false;
+    boolean orig_relm = false;
+    try {
+      for (Avp a : answer.getMessage().getAvps()) {
+        switch (a.getCode()) {
+        case Avp.SESSION_ID:
+          session_id = true;
+          str.append("SESSION_ID : ").append(a.getUTF8String()).append("\n");
+          break;
+        case Avp.DRMP:
+          str.append("\tDRMP : ").append(a.getUTF8String()).append("\n");
+          break;
+        case Avp.RESULT_CODE:
+          str.append("\tRESULT_CODE : ").append(a.getInteger32()).append("\n");
+          break;
+        case Avp.EXPERIMENTAL_RESULT:
+          str.append("\tEXPERIMENTAL_RESULT : ").append(a.getInteger32()).append("\n");
+          break;
+        case Avp.AUTH_SESSION_STATE:
+          auth_sessin_state = true;
+          break;
+
+        case Avp.ORIGIN_HOST:
+          orig_host = true;
+          break;
+        case Avp.ORIGIN_REALM:
+          orig_relm = true;
+          break;
+        case Avp.OC_SUPPORTED_FEATURES:
+          break;
+        case Avp.OC_OLR:
+          break;
+        case Avp.SUPPORTED_FEATURES: // grouped
+          break;
+        case Avp.USER_IDENTIFIER:
+          break;
+        case Avp.MONITORING_EVENT_REPORT: // grouped
+          break;
+        case Avp.MONITORING_EVENT_CONFIG_STATUS: // Grouped
+          break;
+        case Avp.AESE_COMMUNICATION_PATTERN_CONFIG_STATUS: // Grouped
+          break;
+        case Avp.SUPPORTED_SERVICES: // Grouped
+          break;
+        case Avp.S6T_HSS_CAUSE:
+          break;
+        case Avp.FAILED_AVP: // Grouped
+          break;
+        case Avp.PROXY_INFO: // Grouped
+          break;
+        case Avp.ROUTE_RECORD: // Grouped
+          break;
+        default: // got Extra AVP'S
+          break;
+        }
+
+      }
+    } catch (AvpDataException e) {
+      e.printStackTrace();
+    }
+    if (!session_id || !auth_sessin_state || !orig_host || !orig_relm) {
+      logger.error("Configuration-Information-Answer (CIA) - mandatory paramters are missing");
+    }
+    logger.info(str.toString());
+  }
+
+  public void handleReportingInformationRequestEvent(ClientS6tSession session, JReportingInformationRequest request)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    // TODO
+    logger.error("doReportingInformationRequestEvent not yet implemented \"S6t RIR\" event, request[" + request
+        + "], on session[" + session + "]");
+  }
+
+  public void handleNIDDInformationAnswerEvent(ClientS6tSession session, JNIDDInformationRequest request,
+      JNIDDInformationAnswer answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+
+    boolean session_id = false;
+    boolean auth_sessin_state = false;
+    boolean orig_host = false;
+    boolean orig_relm = false;
+
+    StringBuffer str = new StringBuffer("");
+    try {
+      for (Avp a : answer.getMessage().getAvps()) {
+        switch (a.getCode()) {
+        case Avp.SESSION_ID:
+          session_id = true;
+          str.append("SESSION_ID : ").append(a.getUTF8String()).append("\n");
+          break;
+        case Avp.DRMP:
+          str.append("\tDRMP : ").append(a.getUTF8String()).append("\n");
+          break;
+        case Avp.RESULT_CODE:
+          str.append("\tRESULT_CODE : ").append(a.getInteger32()).append("\n");
+          break;
+        case Avp.EXPERIMENTAL_RESULT:
+          str.append("\tEXPERIMENTAL_RESULT : ").append(a.getInteger32()).append("\n");
+          break;
+        case Avp.AUTH_SESSION_STATE:
+          auth_sessin_state = true;
+          break;
+
+        case Avp.ORIGIN_HOST:
+          orig_host = true;
+          break;
+        case Avp.ORIGIN_REALM:
+          orig_relm = true;
+          break;
+        case Avp.OC_SUPPORTED_FEATURES:
+          break;
+        case Avp.OC_OLR:
+          break;
+        case Avp.SUPPORTED_FEATURES: // grouped
+          break;
+        case Avp.USER_IDENTIFIER:
+          break;
+        case Avp.NIDD_AUTHORIZATION_RESPONSE: // grouped
+          break;
+        case Avp.FAILED_AVP: // Grouped
+          break;
+        case Avp.PROXY_INFO: // Grouped
+          break;
+        case Avp.ROUTE_RECORD: // Grouped
+          break;
+        default: // got Extra AVP'S
+          break;
+        }
+
+      }
+    } catch (AvpDataException e) {
+      e.printStackTrace();
+    }
+    if (!session_id || !auth_sessin_state || !orig_host || !orig_relm) {
+      logger.error("NIDD-Information-Answer (NIA) - mandatory paramters are missing");
+    }
+    logger.info(str.toString());
+  }
+
 }

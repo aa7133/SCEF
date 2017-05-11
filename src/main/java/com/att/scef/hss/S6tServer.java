@@ -14,8 +14,6 @@ import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
-import org.jdiameter.api.s6a.ServerS6aSession;
-import org.jdiameter.api.s6t.ClientS6tSession;
 import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.api.s6t.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
@@ -23,7 +21,6 @@ import org.jdiameter.api.s6t.events.JNIDDInformationAnswer;
 import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationAnswer;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
-import org.jdiameter.common.impl.app.cxdx.JRegistrationTerminationRequestImpl;
 import org.jdiameter.common.impl.app.s6t.JConfigurationInformationAnswerImpl;
 import org.jdiameter.common.impl.app.s6t.JNIDDInformationAnswerImpl;
 import org.jdiameter.common.impl.app.s6t.JReportingInformationRequestImpl;
@@ -55,15 +52,17 @@ public class S6tServer extends S6tAbstractServer {
       logger.info("Send RIR to SCEF");
     }
     
-    JReportingInformationRequest rir;
-    try {
+     try {
+       //this.serverS6tSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6tSession.class);
+       ServerS6tSession serverS6tSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6tSession.class);
       //rir = new JReportingInformationRequestImpl(super.createRequest(this.serverS6tSession, JReportingInformationRequest.code));
-      rir = new JReportingInformationRequestImpl(super.createRequest(this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6tSession.class), JReportingInformationRequest.code));
+      JReportingInformationRequest rir = 
+          new JReportingInformationRequestImpl(super.createRequest(serverS6tSession, JReportingInformationRequest.code));
 
       AvpSet reqSet = rir.getMessage().getAvps();
       reqSet.addAvp(Avp.DESTINATION_HOST, this.getRemoteRealm(), true);
 
-      this.serverS6tSession.sendReportingInformationRequest(rir);
+      serverS6tSession.sendReportingInformationRequest(rir);
 
     } catch (InternalException e) {
       // TODO Auto-generated catch block
@@ -140,8 +139,8 @@ public class S6tServer extends S6tAbstractServer {
     case JConfigurationInformationRequest.code:
     case JNIDDInformationRequest.code:
       try {
-        this.serverS6tSession = (ServerS6tSession) this.s6tSessionFactory.getNewSession(request.getSessionId(), ServerS6tSession.class, this.getApplicationId(), (Object[])null);
-        ((NetworkReqListener) this.serverS6tSession).processRequest(request);
+        ServerS6tSession serverS6tSession = (ServerS6tSession) this.s6tSessionFactory.getNewSession(request.getSessionId(), ServerS6tSession.class, this.getApplicationId(), (Object[])null);
+        ((NetworkReqListener) serverS6tSession).processRequest(request);
       } catch (Exception e) {
         logger.error(e.toString());
         e.printStackTrace();

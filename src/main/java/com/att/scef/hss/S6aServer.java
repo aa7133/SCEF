@@ -27,6 +27,7 @@ import org.jdiameter.api.s6a.events.JPurgeUERequest;
 import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
+import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,17 +127,13 @@ public class S6aServer extends S6aAbstractServer {
       if (logger.isInfoEnabled()) {
         logger.info("Send IDR to MME");
       }
+      this.serverS6aSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6aSession.class);
+      ServerS6aSession serverS6aSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6aSession.class);
       
       JInsertSubscriberDataRequest idr =
-          new JInsertSubscriberDataRequestImpl(super.createRequest(this.serverS6aSession, JInsertSubscriberDataRequest.code));
+          new JInsertSubscriberDataRequestImpl(super.createRequest(serverS6aSession, JInsertSubscriberDataRequest.code));
 
-      
-      /*
-        Request idr = this.createRequest(session, this.s6aAuthApplicationId, JInsertSubscriberDataRequest.code,
-                HSS_REALM,
-                this.getConfiguration().getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:23000"));
-      */
-        AvpSet reqSet = idr.getMessage().getAvps();
+      AvpSet reqSet = idr.getMessage().getAvps();
         //idr.getMessage().setRequest(true);
 
         // add data
@@ -169,18 +166,7 @@ public class S6aServer extends S6aAbstractServer {
         // *[ Proxy-Info ]
         // *[ Route-Record ]
         
-        //JInsertSubscriberDataRequest request = this.s6aSessionFactory.createInsertSubscriberDataRequest((Request) idr);
-
-//        ISessionFactory sessionFactory = ((ISessionFactory)this.stack.getSessionFactory());
-//        ServerS6aSession serverS6asession = sessionFactory.getNewAppSession(request.getMessage().getSessionId(),
-//                   this.getApplicationId(), ServerS6aSession.class, (Object)request);
-        this.serverS6aSession.sendInsertSubscriberDataRequest(idr);
-        //serverS6asession.sendInsertSubscriberDataRequest(request);
-
-//        ((ServerS6aSession) ((ISessionFactory) this.stack.getSessionFactory()).getNewAppSession(
-//            //idr.getMessage().getSessionId(), this.getApplicationId(), ServerS6aSession.class,
-//            this.stack.getSessionFactory().getSessionId("S6A-IDR"), this.getApplicationId(), ServerS6aSession.class,
-//                           (Object) idr)).sendInsertSubscriberDataRequest(idr);
+        serverS6aSession.sendInsertSubscriberDataRequest(idr);
         if (logger.isInfoEnabled()) {
           logger.info("Sent IDR to MME");
         }

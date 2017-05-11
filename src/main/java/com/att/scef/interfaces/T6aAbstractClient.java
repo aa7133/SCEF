@@ -33,7 +33,7 @@ import com.att.scef.utils.TBase;
 public abstract class T6aAbstractClient extends TBase implements ClientT6aSessionListener{
   private final Logger logger = LoggerFactory.getLogger(T6aAbstractClient.class);
   private ClientT6aSession clientT6aSession;
-  private T6aSessionFactoryImpl t6aSessionFactory;
+  protected T6aSessionFactoryImpl t6aSessionFactory;
   private static final long VENDOR_ID = 10415;
   private static final long AUTH_APPLICATION_ID = 16777346;
   

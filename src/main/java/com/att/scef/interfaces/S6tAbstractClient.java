@@ -29,7 +29,7 @@ import com.att.scef.utils.TBase;
 public abstract class S6tAbstractClient extends TBase implements ClientS6tSessionListener {
 	private final Logger logger = LoggerFactory.getLogger(S6tAbstractClient.class);
 	private ClientS6tSession clientS6tSession;
-	private S6tSessionFactoryImpl s6tSessionFactory;
+	protected S6tSessionFactoryImpl s6tSessionFactory;
 	private static final long VENDOR_ID = 10415;
 	private static final long AUTH_APPLICATION_ID = 16777345;
 
