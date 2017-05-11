@@ -4,13 +4,10 @@ import java.io.FileInputStream;
 import java.util.concurrent.TimeUnit;
 
 import org.jdiameter.api.ApplicationId;
-import org.jdiameter.api.Avp;
-import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.Mode;
 import org.jdiameter.api.OverloadException;
-import org.jdiameter.api.Request;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -38,19 +35,21 @@ import com.att.scef.utils.TBase;
 
 public abstract class S6aAbstractServer extends TBase implements ServerS6aSessionListener{
 
-  private final Logger logger = LoggerFactory.getLogger(S6tAbstractServer.class);
+  private final Logger logger = LoggerFactory.getLogger(S6aAbstractServer.class);
   protected ServerS6aSession serverS6aSession;
   protected S6aSessionFactoryImpl s6aSessionFactory;
   private static final long VENDOR_ID = 10415;
-  private static final long S6T_AUTH_APPLICATION_ID = 16777251;
+  private static final long S6A_AUTH_APPLICATION_ID = 16777251;
 
   public void init(FileInputStream configStream, String serverId) {
     try {
-      super.init(configStream, serverId, ApplicationId.createByAuthAppId(VENDOR_ID, S6T_AUTH_APPLICATION_ID));
+      super.init(configStream, serverId, ApplicationId.createByAuthAppId(VENDOR_ID, S6A_AUTH_APPLICATION_ID));
       s6aSessionFactory = new S6aSessionFactoryImpl(this.sessionFactory);
       this.sessionFactory.registerAppFacory(ServerS6aSession.class, s6aSessionFactory);
       this.sessionFactory.registerAppFacory(ClientS6aSession.class, s6aSessionFactory);
       s6aSessionFactory.setServerSessionListener(this);
+      this.serverS6aSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6aSession.class);
+
     } catch (Exception e) {
       e.printStackTrace();
     } finally {

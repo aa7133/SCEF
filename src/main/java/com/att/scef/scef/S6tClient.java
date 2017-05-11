@@ -1,4 +1,4 @@
-package com.att.scef.interfaces;
+package com.att.scef.scef;
 
 import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
 import static org.jdiameter.client.impl.helpers.Parameters.RealmEntry;
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
-import com.att.scef.scef.SCEF;
+import com.att.scef.interfaces.S6tAbstractClient;
 import com.att.scef.utils.BCDStringConverter;
 
 public class S6tClient extends S6tAbstractClient {

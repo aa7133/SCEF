@@ -34,9 +34,9 @@ import org.slf4j.LoggerFactory;
 import com.att.scef.utils.TBase;
 
 public abstract class S6aAbstractClient extends TBase implements ClientS6aSessionListener {
-  private final Logger logger = LoggerFactory.getLogger(S6tAbstractClient.class);
+  private final Logger logger = LoggerFactory.getLogger(S6aAbstractClient.class);
   private ClientS6aSession clientS6aSession;
-  private S6aSessionFactoryImpl s6aSessionFactory;
+  protected S6aSessionFactoryImpl s6aSessionFactory;
   private static final long VENDOR_ID = 10415;
   private static final long AUTH_APPLICATION_ID = 16777251;
 

@@ -55,8 +55,6 @@ import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.interfaces.AbstractServer;
-import com.att.scef.interfaces.S6tClient;
-import com.att.scef.interfaces.T6aServer;
 import com.att.scef.utils.BCDStringConverter;
 import com.att.scef.utils.MonitoringType;
 import com.google.gson.Gson;
@@ -162,7 +160,12 @@ public class SCEF {
 
 		//TODO replace this with S6t and T6a functions
 		this.scefId = this.s6tClient.getStack().getMetaData().getConfiguration().getStringValue(OwnDiameterURI.ordinal(), DEFAULT_SCEF_ID);
+		if (logger.isInfoEnabled()) {
+		  this.s6tClient.checkConfig();
+		  this.t6aServer.checkConfig();
+		}
 
+		
 		logger.info("=================================== SCEF started ==============================");
 	}
 	

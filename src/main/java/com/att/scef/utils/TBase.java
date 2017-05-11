@@ -1,5 +1,7 @@
 package com.att.scef.utils;
 
+import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
+import static org.jdiameter.client.impl.helpers.Parameters.OwnRealm;
 import static org.jdiameter.client.impl.helpers.Parameters.PeerTable;
 import static org.jdiameter.client.impl.helpers.Parameters.PeerName;
 import static org.jdiameter.client.impl.helpers.Parameters.RealmEntry;
@@ -59,6 +61,7 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
   protected ISessionFactory sessionFactory;
   private String remoteRealm = null;
   private String[] peers = null;
+  private String destinationHost;
   
   protected ApplicationId applicationId;
 
@@ -79,8 +82,9 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     peers = new String[peersConfig.length];
     for (int i = 0; i < peersConfig.length; i++) {
       peers[i] = peersConfig[i].getStringValue(PeerName.ordinal(), null);
+      logger.info("Peer = " + peers[i]);
     }
-    
+    destinationHost = peers[0];
   }
 
   public void updateAnswer(Message req, Message ans, int resultCode) {
@@ -145,7 +149,8 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
     // { Origin-Host }
     reqSet.removeAvp(Avp.ORIGIN_HOST);
-    reqSet.addAvp(Avp.ORIGIN_HOST, this.getFirstPeerFromList(), true);
+    reqSet.addAvp(Avp.ORIGIN_HOST, this.getStack().getMetaData().getConfiguration()
+        .getStringValue(OwnDiameterURI.ordinal(), (String) OwnDiameterURI.defValue()), true);
     return r;
   }
  
@@ -161,6 +166,10 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     return this.peers[0];
   }
   
+  public String getDestinationHost() {
+    return this.destinationHost;
+  }
+  
   public Stack getStack() {
     return this.stack;
   }
@@ -168,6 +177,23 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
   public ISessionFactory getSessionFactory() {
     return sessionFactory;
   }
+  
+  public void checkConfig() {
+    Configuration config = this.getStack().getMetaData().getConfiguration();
+    Configuration[] realmTable = config.getChildren(RealmTable.ordinal());
+    for (Configuration rt : realmTable) {
+      for (Configuration e : rt.getChildren(RealmEntry.ordinal())) {
+        logger.info("To Realm = " + e.getStringValue(RealmName.ordinal(), ""));          
+      }
+    }
+    Configuration[] peersConfig = config.getChildren(PeerTable.ordinal());
+    for (int i = 0; i < peersConfig.length; i++) {
+      logger.info("To Peer = " + peersConfig[i].getStringValue(PeerName.ordinal(), null));
+    }
+    logger.info("Local URI = " + config.getStringValue(OwnDiameterURI.ordinal(), (String) OwnDiameterURI.defValue()));
+    logger.info("Local Realm = " + config.getStringValue(OwnRealm.ordinal(), (String) OwnRealm.defValue()));
+  }
+
   
   // --------- Default Implementation
   // --------- Depending on class it is overridden or by default makes test fail.

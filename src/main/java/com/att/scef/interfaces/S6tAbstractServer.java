@@ -39,6 +39,8 @@ public abstract class S6tAbstractServer extends TBase implements ServerS6tSessio
       this.sessionFactory.registerAppFacory(ServerS6tSession.class, s6tSessionFactory);
       this.sessionFactory.registerAppFacory(ClientS6tSession.class, s6tSessionFactory);
       s6tSessionFactory.setServerSessionListener(this);
+      this.serverS6tSession = this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6tSession.class);
+
     } catch (Exception e) {
       e.printStackTrace();
     } finally {

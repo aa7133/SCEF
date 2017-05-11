@@ -1,4 +1,4 @@
-package com.att.scef.interfaces;
+package com.att.scef.hss;
 
 import java.io.FileInputStream;
 
@@ -7,11 +7,9 @@ import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
-import org.jdiameter.api.Message;
 import org.jdiameter.api.NetworkReqListener;
 import org.jdiameter.api.OverloadException;
 import org.jdiameter.api.Request;
-import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -29,8 +27,6 @@ import org.jdiameter.api.s6a.events.JPurgeUERequest;
 import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
-import org.jdiameter.client.api.ISessionFactory;
-import org.jdiameter.common.api.app.s6a.IS6aSessionFactory;
 import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +35,7 @@ import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GCommunicationPatternSet;
 import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
-import com.att.scef.hss.HSS;
+import com.att.scef.interfaces.S6aAbstractServer;
 
 public class S6aServer extends S6aAbstractServer {
   protected final Logger logger = LoggerFactory.getLogger(S6tServer.class);
@@ -124,9 +120,12 @@ public class S6aServer extends S6aAbstractServer {
 }
 
   
-  public void sendIDRRequest(AppSession session, GHSSUserProfile hssData, String mmeAddress) {
+  public void sendIDRRequest(GHSSUserProfile hssData, String mmeAddress) {
     // build  IDR message to mme for update user data
     try {
+      if (logger.isInfoEnabled()) {
+        logger.info("Send IDR to MME");
+      }
       
       JInsertSubscriberDataRequest idr =
           new JInsertSubscriberDataRequestImpl(super.createRequest(this.serverS6aSession, JInsertSubscriberDataRequest.code));
@@ -150,11 +149,13 @@ public class S6aServer extends S6aAbstractServer {
         // { Origin-Host } by createRequest
         // { Origin-Realm } by createRequest
         // { Destination-Host }
-        reqSet.addAvp(Avp.DESTINATION_HOST, mmeAddress, true);
+        reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
         // { Destination-Realm }
-        reqSet.addAvp(Avp.DESTINATION_REALM, this.getRemoteRealm(), true);
+        //added at create request
+        //reqSet.addAvp(Avp.DESTINATION_REALM, this.getRemoteRealm(), true);
         // { User-Name }
-        reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
+        //TODO fix imsi later
+        //reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
         // *[ Supported-Features]
         // { Subscription-Data}
 
@@ -173,13 +174,17 @@ public class S6aServer extends S6aAbstractServer {
 //        ISessionFactory sessionFactory = ((ISessionFactory)this.stack.getSessionFactory());
 //        ServerS6aSession serverS6asession = sessionFactory.getNewAppSession(request.getMessage().getSessionId(),
 //                   this.getApplicationId(), ServerS6aSession.class, (Object)request);
-//        serverS6asession.sendInsertSubscriberDataRequest(request);
+        this.serverS6aSession.sendInsertSubscriberDataRequest(idr);
+        //serverS6asession.sendInsertSubscriberDataRequest(request);
 
-        ((ServerS6aSession) ((ISessionFactory) this.stack.getSessionFactory()).getNewAppSession(
-            //idr.getMessage().getSessionId(), this.getApplicationId(), ServerS6aSession.class,
-            this.stack.getSessionFactory().getSessionId("S6A-IDR"), this.getApplicationId(), ServerS6aSession.class,
-                           (Object) idr)).sendInsertSubscriberDataRequest(idr);
-        
+//        ((ServerS6aSession) ((ISessionFactory) this.stack.getSessionFactory()).getNewAppSession(
+//            //idr.getMessage().getSessionId(), this.getApplicationId(), ServerS6aSession.class,
+//            this.stack.getSessionFactory().getSessionId("S6A-IDR"), this.getApplicationId(), ServerS6aSession.class,
+//                           (Object) idr)).sendInsertSubscriberDataRequest(idr);
+        if (logger.isInfoEnabled()) {
+          logger.info("Sent IDR to MME");
+        }
+
     } catch (InternalException e) {
         e.printStackTrace();
     } catch (IllegalDiameterStateException e) {
@@ -204,8 +209,9 @@ public class S6aServer extends S6aAbstractServer {
     case JUpdateLocationRequest.code:
     case JNotifyRequest.code:
       try {
-        this.serverS6aSession = (ServerS6aSession) this.s6aSessionFactory.getNewSession(request.getSessionId(), ServerS6aSession.class, this.getApplicationId(), (Object[])null);
-        ((NetworkReqListener) this.serverS6aSession).processRequest(request);
+        ServerS6aSession serverS6aSession = (ServerS6aSession)this.s6aSessionFactory
+            .getNewSession(request.getSessionId(), ServerS6aSession.class, this.getApplicationId(), (Object[])null);
+        ((NetworkReqListener)serverS6aSession).processRequest(request);
       } catch (Exception e) {
         logger.error(e.toString());
         e.printStackTrace();

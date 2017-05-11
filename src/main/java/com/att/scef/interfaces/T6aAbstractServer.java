@@ -30,15 +30,15 @@ import org.slf4j.LoggerFactory;
 import com.att.scef.utils.TBase;
 
 public abstract class T6aAbstractServer extends TBase implements ServerT6aSessionListener {
-  private final Logger logger = LoggerFactory.getLogger(S6tAbstractServer.class);
+  private final Logger logger = LoggerFactory.getLogger(T6aAbstractServer.class);
   protected ServerT6aSession serverT6aSession;
   protected T6aSessionFactoryImpl t6aSessionFactory;
   private static final long VENDOR_ID = 10415;
-  private static final long S6T_AUTH_APPLICATION_ID = 16777346;
+  private static final long T6A_AUTH_APPLICATION_ID = 16777346;
 
   public void init(FileInputStream configStream, String serverId) {
     try {
-      super.init(configStream, serverId, ApplicationId.createByAuthAppId(VENDOR_ID, S6T_AUTH_APPLICATION_ID));
+      super.init(configStream, serverId, ApplicationId.createByAuthAppId(VENDOR_ID, T6A_AUTH_APPLICATION_ID));
       t6aSessionFactory = new T6aSessionFactoryImpl(this.sessionFactory);
       this.sessionFactory.registerAppFacory(ServerT6aSession.class, t6aSessionFactory);
       this.sessionFactory.registerAppFacory(ClientT6aSession.class, t6aSessionFactory);

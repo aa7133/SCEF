@@ -65,8 +65,6 @@ import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GUserIdentifier;
 import com.att.scef.interfaces.AbstractServer;
-import com.att.scef.interfaces.S6aServer;
-import com.att.scef.interfaces.S6tServer;
 import com.att.scef.utils.AESE_CommunicationPattern;
 import com.att.scef.utils.MonitoringEventConfig;
 import com.att.scef.utils.UserIdentifier;
@@ -161,6 +159,10 @@ public class HSS {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+        if (logger.isInfoEnabled()) {
+          this.s6tServer.checkConfig();
+          this.s6aServer.checkConfig();
+        }
 
 		logger.info("=================================== HSS started ==============================");
 	}
@@ -271,7 +273,6 @@ public class HSS {
 			}
 
 			if (newUser) {
-              logger.info("CIR 3");
 	          hssData = new GHSSUserProfile();
 			  hssData.setMonitoringConfig((GMonitoringEventConfig[])monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]));
 			  hssData.setAESECommunicationPattern((GAESE_CommunicationPattern[])aeseComPattern.toArray(new GAESE_CommunicationPattern[aeseComPattern.size()]));
@@ -281,7 +282,6 @@ public class HSS {
 			  this.getSyncHandler().set(key, value);
 			}
 			else {
-	            logger.info("CIR 4");
 	            String value = future.get(5, TimeUnit.MILLISECONDS);
 	            hssData = new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
 
@@ -318,8 +318,10 @@ public class HSS {
     		
     		// we have MME 
     		//TODO remove renmarks
-    		this.s6aServer.sendIDRRequest(session, hssData, mmeAddress);
+    		this.s6aServer.sendIDRRequest(hssData, mmeAddress);
 	   	 
+    		this.s6tServer.sendRIR();
+    		
 	   	    // finish the asynchronous write
 	   	    setHss.get();
             logger.info("CIR 9");

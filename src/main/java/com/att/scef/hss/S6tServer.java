@@ -1,8 +1,9 @@
-package com.att.scef.interfaces;
+package com.att.scef.hss;
 
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
+import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
@@ -13,6 +14,8 @@ import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
+import org.jdiameter.api.s6a.ServerS6aSession;
+import org.jdiameter.api.s6t.ClientS6tSession;
 import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.api.s6t.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
@@ -20,12 +23,14 @@ import org.jdiameter.api.s6t.events.JNIDDInformationAnswer;
 import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationAnswer;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
+import org.jdiameter.common.impl.app.cxdx.JRegistrationTerminationRequestImpl;
 import org.jdiameter.common.impl.app.s6t.JConfigurationInformationAnswerImpl;
 import org.jdiameter.common.impl.app.s6t.JNIDDInformationAnswerImpl;
+import org.jdiameter.common.impl.app.s6t.JReportingInformationRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.att.scef.hss.HSS;
+import com.att.scef.interfaces.S6tAbstractServer;
 
 public class S6tServer extends S6tAbstractServer {
   protected final Logger logger = LoggerFactory.getLogger(S6tServer.class);
@@ -45,6 +50,41 @@ public class S6tServer extends S6tAbstractServer {
     this.init(new FileInputStream(this.configFile), serverID);
   }
 
+  public void sendRIR() {
+    if (logger.isInfoEnabled()) {
+      logger.info("Send RIR to SCEF");
+    }
+    
+    JReportingInformationRequest rir;
+    try {
+      //rir = new JReportingInformationRequestImpl(super.createRequest(this.serverS6tSession, JReportingInformationRequest.code));
+      rir = new JReportingInformationRequestImpl(super.createRequest(this.sessionFactory.getNewAppSession(getApplicationId(), ServerS6tSession.class), JReportingInformationRequest.code));
+
+      AvpSet reqSet = rir.getMessage().getAvps();
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getRemoteRealm(), true);
+
+      this.serverS6tSession.sendReportingInformationRequest(rir);
+
+    } catch (InternalException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (RouteException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } 
+
+    
+    if (logger.isInfoEnabled()) {
+      logger.info("Sent RIR to SCEF");
+    }
+
+  }
   
   public void sendCIAAnswer(ServerS6tSession session, JConfigurationInformationRequest cir, int resultCode) {
     try {

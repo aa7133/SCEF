@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import com.att.scef.utils.TBase;
 
 public abstract class T6aAbstractClient extends TBase implements ClientT6aSessionListener{
-  private final Logger logger = LoggerFactory.getLogger(S6tAbstractClient.class);
+  private final Logger logger = LoggerFactory.getLogger(T6aAbstractClient.class);
   private ClientT6aSession clientT6aSession;
   private T6aSessionFactoryImpl t6aSessionFactory;
   private static final long VENDOR_ID = 10415;
@@ -46,7 +46,7 @@ public abstract class T6aAbstractClient extends TBase implements ClientT6aSessio
 
       t6aSessionFactory.setClientSessionListener(this);
 
-      this.clientT6aSession = this.sessionFactory.getNewAppSession(this.sessionFactory.getSessionId("S6a"),
+      this.clientT6aSession = this.sessionFactory.getNewAppSession(this.sessionFactory.getSessionId("T6a"),
           getApplicationId(), ClientT6aSession.class, (Object[]) null);
     } catch (InternalException e) {
       e.printStackTrace();

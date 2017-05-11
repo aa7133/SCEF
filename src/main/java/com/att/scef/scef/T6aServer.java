@@ -1,4 +1,4 @@
-package com.att.scef.interfaces;
+package com.att.scef.scef;
 
 import java.io.FileInputStream;
 
@@ -21,7 +21,8 @@ import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.att.scef.scef.SCEF;
+import com.att.scef.hss.S6tServer;
+import com.att.scef.interfaces.T6aAbstractServer;
 
 public class T6aServer extends T6aAbstractServer {
   protected final Logger logger = LoggerFactory.getLogger(S6tServer.class);
