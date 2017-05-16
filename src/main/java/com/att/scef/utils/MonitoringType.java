@@ -28,15 +28,20 @@ public class MonitoringType {
   private static final int NUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA_FLAG = 128;
   
   public static int getNewMonitoringMap(int oldMap, int newMap) {
-	  return ((oldMap & 0xff) ^ (newMap & 0xff) & newMap);
+    int val = (oldMap ^ newMap);
+    val = val & newMap;
+    return val;
   }
 
   public static int getDeletedMonitoringMap(int oldMap, int newMap) {
-	  return ((oldMap & 0xff) ^ (newMap & 0xff) & oldMap);
+    int val = (oldMap ^ newMap);
+    val = val & oldMap;
+    return val;
   }
   
   public static int getRemaindMonitoringMap(int oldMap, int newMap) {
-	  return ((oldMap & 0xff) & (newMap & 0xff));
+    int val = (oldMap & newMap);
+    return val;
   }
 
   public static int getnextMonitoringMap(int oldMap, int newMap) {

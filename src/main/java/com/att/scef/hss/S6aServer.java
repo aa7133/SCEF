@@ -1,6 +1,7 @@
 package com.att.scef.hss;
 
 import java.io.FileInputStream;
+import java.util.List;
 
 import org.jdiameter.api.Answer;
 import org.jdiameter.api.Avp;
@@ -56,10 +57,10 @@ public class S6aServer extends S6aAbstractServer {
     this.init(new FileInputStream(this.configFile), serverID);
   }
   
-  private void buildUserDataAvp(GHSSUserProfile hssData, AvpSet userData, long vendorId) {
+  private void buildUserDataAvp(GHSSUserProfile hssData, AvpSet userData, long vendorId, List<GMonitoringEventConfig> forDelete) {
+    AvpSet monitoringEvCon;
     for (GMonitoringEventConfig mo : hssData.getMonitoringConfig()) {
-        boolean isRefId = false;
-        AvpSet monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
+        monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
         monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vendorId, true, false, true);
         
         logger.info("buildUserDataAvp Monitoring Type = " + mo.getMonitoringType());
@@ -67,26 +68,23 @@ public class S6aServer extends S6aAbstractServer {
         monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vendorId, true, false);
 
         if (mo.getScefRefId() != 0) {
-            isRefId = true;
             monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID, mo.getScefRefId());
         }
-    
-        int[] refFordel = mo.getScefRefIdForDelition();
-        if (refFordel != null) {
-            for (int i : refFordel) {
-                isRefId = true;
-                monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
-                logger.info("Monitoring type for delition  = " + i);
-                monitoringEvCon.removeAvp(Avp.SCEF_REFERENCE_ID);
-            }
-        }
-
-        if (isRefId == false) {
-            logger.error("No SCEF-Reference-ID or SCEF-Reference-ID-For-Delition exists event skiped");
-            userData.removeAvp(Avp.MONITORING_EVENT_CONFIGURATION);
-            continue;
-        }
         monitoringEvCon.addAvp(Avp.MAXIMUM_NUMBER_OF_REPORTS, mo.getMaximumNumberOfReports(), vendorId, true, false);
+    }
+
+    if (forDelete != null) {
+      for (GMonitoringEventConfig g : forDelete) {
+        monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
+        monitoringEvCon.addAvp(Avp.SCEF_ID, g.getScefId(), vendorId, true, false, true);
+        
+        logger.info("buildUserDataAvp Monitoring Type  for delition= " + g.getMonitoringType());
+        
+        monitoringEvCon.addAvp(Avp.MONITORING_TYPE, g.getMonitoringType(), vendorId, true, false);
+        for (int i :g.getScefRefIdForDelition()) {
+          monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
+        }
+      }
     }
     
     for (GAESE_CommunicationPattern ae : hssData.getAESECommunicationPattern()) {
@@ -126,7 +124,7 @@ public class S6aServer extends S6aAbstractServer {
 }
 
   
-  public void sendIDRRequest(GHSSUserProfile hssData, String mmeAddress) {
+  public void sendIDRRequest(GHSSUserProfile hssData, List<GMonitoringEventConfig> forDelete, String mmeAddress) {
     // build  IDR message to mme for update user data
     try {
       if (logger.isInfoEnabled()) {
@@ -157,13 +155,13 @@ public class S6aServer extends S6aAbstractServer {
         //reqSet.addAvp(Avp.DESTINATION_REALM, this.getRemoteRealm(), true);
         // { User-Name }
         //TODO fix imsi later
-        //reqSet.addAvp(Avp.USER_NAME, hssData.getIMSI(), true);
+        reqSet.addAvp(Avp.USER_NAME, hssData.getMsisdn(), false);
         // *[ Supported-Features]
         // { Subscription-Data}
 
-        buildUserDataAvp(hssData, reqSet.addGroupedAvp(Avp.SUBSCRIPTION_DATA,
-                                 this.getApplicationId().getVendorId(), true, false),
-                                 this.getApplicationId().getVendorId());
+        AvpSet subscriberData = reqSet.addGroupedAvp(Avp.SUBSCRIPTION_DATA, getApplicationId().getVendorId(), true, false);
+
+        buildUserDataAvp(hssData, subscriberData, this.getApplicationId().getVendorId(),forDelete);
 
         // [ IDR- Flags ]
         // *[ Reset-ID ]

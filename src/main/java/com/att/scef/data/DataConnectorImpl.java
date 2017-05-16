@@ -7,7 +7,7 @@ public class DataConnectorImpl implements DataConnector {
 	private static RedisClient client = null;
 	private static final String DEFAULT_REDIS_ADDRESS = "redis://localhost/";
 
-	protected DataConnectorImpl(RedisURI uri) {
+	public DataConnectorImpl(RedisURI uri) {
 		if (client == null) {
 			client = RedisClient.create(uri);
 		}

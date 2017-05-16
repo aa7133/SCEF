@@ -1,4 +1,4 @@
-package com.att.scef.utils;
+package com.att.scef.scef;
 
 public class SCEFRangeException extends Exception {
 	  private static final long serialVersionUID = 1L;

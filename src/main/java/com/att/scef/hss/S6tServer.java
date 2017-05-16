@@ -14,6 +14,7 @@ import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
+import org.jdiameter.api.s6t.ClientS6tSession;
 import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.api.s6t.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
@@ -60,7 +61,7 @@ public class S6tServer extends S6tAbstractServer {
           new JReportingInformationRequestImpl(super.createRequest(serverS6tSession, JReportingInformationRequest.code));
 
       AvpSet reqSet = rir.getMessage().getAvps();
-      reqSet.addAvp(Avp.DESTINATION_HOST, this.getRemoteRealm(), true);
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
 
       serverS6tSession.sendReportingInformationRequest(rir);
 
@@ -147,18 +148,20 @@ public class S6tServer extends S6tAbstractServer {
       }
       return null;
     case JReportingInformationAnswer.code:
-      logger.error(new StringBuilder("processRequest - : Reporting-Information-Request: Not Supported message in this state: ")
-          .append(request.getCommandCode())
-          .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
-          .append(request.getClass().getName()).toString());
-      break;
-    default:
+      try {
+        ClientS6tSession clientS6tSession = (ClientS6tSession)this.s6tSessionFactory.getNewSession(request.getSessionId(), ClientS6tSession.class, this.getApplicationId(), (Object[])null);
+        ((NetworkReqListener)clientS6tSession).processRequest(request);
+      } catch (Exception e) {
+        logger.error(e.toString());
+        e.printStackTrace();
+      }
+      return null;
+   default:
       logger.error(new StringBuilder("processRequest - S6t - Not Supported message: ").append(request.getCommandCode())
           .append(" from interface : ").append(request.getApplicationId()).append(" from Class ")
           .append(request.getClass().getName()).toString());
       return null;
     }
-    return null;
   }
 
   @Override

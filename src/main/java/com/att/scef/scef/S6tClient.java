@@ -25,6 +25,7 @@ import org.jdiameter.api.s6t.events.JNIDDInformationAnswer;
 import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationAnswer;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
+import org.jdiameter.common.impl.app.s6t.JReportingInformationAnswerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,35 +55,38 @@ public class S6tClient extends S6tAbstractClient {
   public void sendCirRequest(GSCEFUserProfile newMsg, GMonitoringEventConfig[] mc, GAESE_CommunicationPattern[] cp) {
     try {
       Configuration conf = this.getStack().getMetaData().getConfiguration();
-      ClientS6tSession session = (ClientS6tSession) this.sessionFactory
-          .getNewAppSession(this.getStack().getSessionFactory().getSessionId("S6t-CIR"),
-              this.getApplicationId(), ClientS6tSession.class, (Object[]) null);
-      
+      ClientS6tSession session = (ClientS6tSession) this.sessionFactory.getNewAppSession(
+          this.getStack().getSessionFactory().getSessionId("S6t-CIR"), this.getApplicationId(), ClientS6tSession.class,
+          (Object[]) null);
+
       String localaddr = conf.getStringValue(OwnDiameterURI.ordinal(), "aaa://127.0.0.1:15868");
       if (logger.isInfoEnabled()) {
-        logger.info(new StringBuilder("target realm = " ).append(this.getRemoteRealm()).append(", localAddress = ")
+        logger.info(new StringBuilder("target realm = ").append(this.getRemoteRealm()).append(", localAddress = ")
             .append(localaddr).append(", Session id =").append(session.getSessionId()).toString());
       }
-      Request request = this.createRequest(session, JConfigurationInformationRequest.code, this.getRemoteRealm(), localaddr);
+      Request request = this.createRequest(session, JConfigurationInformationRequest.code);
 
       AvpSet reqSet = request.getAvps();
-      // Add user identity 
+
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
+
+      // Add user identity
       AvpSet userIdentifier = reqSet.addGroupedAvp(Avp.USER_IDENTIFIER, getApplicationId().getVendorId(), true, false);
-      
+
       String extId = newMsg.getExternalId();
       if (extId != null && extId.length() != 0) {
         userIdentifier.addAvp(Avp.EXTERNAL_IDENTIFIER, extId, getApplicationId().getVendorId(), true, false, false);
       }
       String msisdn = newMsg.getMsisdn();
       if (msisdn != null && msisdn.length() != 0) {
-        userIdentifier.addAvp(Avp.MSISDN, BCDStringConverter.toBCD(msisdn), getApplicationId().getVendorId(), true, false);
+        userIdentifier.addAvp(Avp.MSISDN, BCDStringConverter.toBCD(msisdn), getApplicationId().getVendorId(), true,
+            false);
       }
       String userNmae = newMsg.getUserName();
       if (userNmae != null && userNmae.length() != 0) {
         userIdentifier.addAvp(Avp.USER_NAME, userNmae, getApplicationId().getVendorId(), true, false, false);
       }
-   
-      
+
       if (mc != null && mc.length > 0) {
         for (GMonitoringEventConfig m : mc) {
           AvpSet monEvConf = reqSet.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION,
@@ -122,8 +126,8 @@ public class S6tClient extends S6tAbstractClient {
     } catch (OverloadException e) {
       e.printStackTrace();
     }
-	}	
-	
+  }
+
   public void sendNirRequest(GSCEFUserProfile profile) {
     try {
       Configuration conf = this.getStack().getMetaData().getConfiguration();
@@ -139,7 +143,7 @@ public class S6tClient extends S6tAbstractClient {
             .append(localaddr).append(", Session id =").append(session.getSessionId()).toString());
       }
       
-      Request request = this.createRequest(session, JNIDDInformationRequest.code, this.getRemoteRealm(), localaddr);
+      Request request = this.createRequest(session, JNIDDInformationRequest.code);
  
       AvpSet reqSet = request.getAvps();
 
@@ -192,17 +196,42 @@ public class S6tClient extends S6tAbstractClient {
       e.printStackTrace();
     }
   }
+  
+  public void sendRIA(ClientS6tSession session, JReportingInformationRequest request, int resultCode) {
+    try {
+      JReportingInformationAnswer ria = new JReportingInformationAnswerImpl((Request)request.getMessage(), resultCode);
+      
+      Answer answer = (Answer)ria.getMessage();
+      AvpSet set = answer.getAvps();
+
+      session.sendReportingInformationAnswer(this.s6tSessionFactory.createReportingInformationAnswer(answer));
+      
+    } catch (InternalException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (RouteException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    
+  }
+  
 	
   @Override
   public Answer processRequest(Request request) {
-    //logger.info("processRequest");
     int code = request.getCommandCode();
     switch (code) {
     case JConfigurationInformationRequest.code:
     case JNIDDInformationRequest.code:
       try {
         ClientS6tSession clientS6tSession = (ClientS6tSession) this.s6tSessionFactory
-            .getNewSession(request.getSessionId(), ClientS6tSession.class, this.getApplicationId(), (Object[])null);
+            .getNewSession(request.getSessionId(), ClientS6tSession.class, this.getApplicationId(), (Object[]) null);
 
         ((NetworkReqListener) clientS6tSession).processRequest(request);
       } catch (Exception e) {
@@ -212,10 +241,10 @@ public class S6tClient extends S6tAbstractClient {
       return null;
     case JReportingInformationAnswer.code:
       try {
-        ServerS6tSession serverS6tSession = (ServerS6tSession) this.s6tSessionFactory
-            .getNewSession(request.getSessionId(), ServerS6tSession.class, this.getApplicationId(), (Object[])null);
+        ClientS6tSession clientS6tSession = (ClientS6tSession) this.s6tSessionFactory
+            .getNewSession(request.getSessionId(), ClientS6tSession.class, this.getApplicationId(), (Object[]) null);
 
-        ((NetworkReqListener) serverS6tSession).processRequest(request);
+        ((NetworkReqListener) clientS6tSession).processRequest(request);
       } catch (Exception e) {
         logger.error(e.toString());
         e.printStackTrace();

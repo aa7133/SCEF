@@ -17,6 +17,7 @@ import org.jdiameter.api.Mode;
 import org.jdiameter.api.Network;
 import org.jdiameter.api.OverloadException;
 import org.jdiameter.api.Request;
+import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
@@ -54,9 +55,11 @@ import com.att.scef.data.SyncPubSubConnector;
 import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
+import com.att.scef.gson.GUserIdentifier;
 import com.att.scef.interfaces.AbstractServer;
 import com.att.scef.utils.BCDStringConverter;
 import com.att.scef.utils.MonitoringType;
+import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.lambdaworks.redis.RedisFuture;
@@ -158,10 +161,11 @@ public class SCEF {
 			e.printStackTrace();
 		}
 
-		//TODO replace this with S6t and T6a functions
 		this.scefId = this.s6tClient.getStack().getMetaData().getConfiguration().getStringValue(OwnDiameterURI.ordinal(), DEFAULT_SCEF_ID);
 		if (logger.isInfoEnabled()) {
+	        logger.info("=================================== S6t ==============================");
 		  this.s6tClient.checkConfig();
+	        logger.info("=================================== T6a ==============================");
 		  this.t6aServer.checkConfig();
 		}
 
@@ -208,7 +212,7 @@ public class SCEF {
 				mc[i] = new GMonitoringEventConfig();
 				mc[i].setMonitoringType(ml.get(i));
 				mc[i].setScefRefId(ml.get(i));
-				//TODO get the SCEF address and fill the parameter from the configuration 
+				//get the SCEF address and fill the parameter from the configuration 
 				mc[i].setScefId(this.scefId);
 			}
 			newMsg.setMc(mc);
@@ -260,10 +264,9 @@ public class SCEF {
 				mc[i] = new GMonitoringEventConfig();
 				mc[i].setMonitoringType(mapToAdd.get(i));
 				mc[i].setScefRefId(mapToAdd.get(i));
-				//TODO get the SCEF address and fill the parameter from the configuration 
 				mc[i].setScefId(this.scefId);
 			}
-			//TODO current support is just for 1 SCEF ref ID so the delete will be the same.
+			//current support is just for 1 SCEF ref ID so the delete will be the same.
 			// in real application it may be several deletion for one monitoring type
 			for (int j = 0; j < mapToDelete.size(); j++, i++) {
 				mc[i] = new GMonitoringEventConfig();
@@ -521,9 +524,10 @@ public class SCEF {
 
   public void handleReportingInformationRequestEvent(ClientS6tSession session, JReportingInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    // TODO
-    logger.error("doReportingInformationRequestEvent not yet implemented \"S6t RIR\" event, request[" + request
-        + "], on session[" + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got RIR from ");
+    }
+    this.s6tClient.sendRIA(session, request, ResultCode.SUCCESS);
   }
 
   public void handleNIDDInformationAnswerEvent(ClientS6tSession session, JNIDDInformationRequest request,
@@ -592,4 +596,115 @@ public class SCEF {
     logger.info(str.toString());
   }
 
+  public void handleT6aOtherEvent(AppSession session, AppRequestEvent request, AppAnswerEvent answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("Received \"T6a Other\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
+  }
+
+  public void handleSendConfigurationInformationAnswerEvent(ServerT6aSession session,
+      org.jdiameter.api.t6a.events.JConfigurationInformationRequest request, org.jdiameter.api.t6a.events.JConfigurationInformationAnswer answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a CIA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
+  }
+
+  public void handleSendConfigurationInformationRequestEvent(ServerT6aSession session,
+      org.jdiameter.api.t6a.events.JConfigurationInformationRequest request)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a CIR\" event, request[" + request + "], on session[" + session + "]");
+  }
+
+  public void handleSendReportingInformationRequestEvent(ServerT6aSession session,
+      org.jdiameter.api.t6a.events.JReportingInformationRequest request)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a RIR\" event, request[" + request + "], on session[" + session + "]");
+  }
+
+  public void handleSendMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    if (logger.isInfoEnabled()) {
+      logger.info("Got NIDD Information Request (NIR)");
+    }
+    AvpSet reqSet = request.getMessage().getAvps();
+    
+    
+    try {
+      Avp userIdentifier = reqSet.getAvp(Avp.USER_IDENTIFIER);
+      if (userIdentifier == null) {
+          if (logger.isInfoEnabled()) {
+              logger.info("MO-Data-Request (ODR) missing the mandatory \"User-Identifier\" parameter");
+          }
+          this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+          return;
+      }
+      
+
+      
+      
+      
+      Avp bearer = reqSet.getAvp(Avp.BEARER_IDENTIFIER);
+      if (bearer == null) {
+        if (logger.isInfoEnabled()) {
+            logger.info("MO-Data-Request (ODR) missing the mandatory \"Bearer-Identifier\" parameter");
+        }
+        this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_INVALID_EPS_BEARER);
+        return;
+      }
+
+      byte[] bearearIdentifier = bearer.getOctetString();
+      String bearerString = new String(bearearIdentifier);
+      /*
+      StringBuffer sb = new StringBuffer();
+      for (byte b : bearearIdentifier) {
+        sb.append((char)b);
+      }
+      */
+      logger.info("Bearer id = " + bearerString);
+      
+      //TODO  need to send data to application
+      Avp niddData = reqSet.getAvp(Avp.NON_IP_DATA);
+      String msg = niddData.getUTF8String();
+      logger.info("got message : \"" + msg + "\"");
+
+      GUserIdentifier uid;
+      uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
+      String msisdn = uid.getMsisdn();
+
+      String data = this.getSyncHandler().get("SCEF-MSISDN-" + msisdn);
+
+      GSCEFUserProfile userProfile = null;
+      
+      if (data == null || data.length() == 0) {
+        logger.error("User not found in scef data base");
+        this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+      userProfile =  new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
+      this.getAsyncPubSubHandler().publish(userProfile.getDataQueueAddress(), msg);
+      userProfile.getDataQueueAddress();
+      
+    } catch (AvpDataException e) {
+      e.printStackTrace();
+    }
+    
+    this.t6aServer.sendODA(session, request, ResultCode.SUCCESS);
+  }
+
+  public void handleSendMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a TDA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
+  }
+
+  public void handleSendConnectionManagementAnswertEvent(ServerT6aSession session, JConnectionManagementRequest request,
+      JConnectionManagementAnswer answer)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a CMA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
+  }
+
+  public void handleSendConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
+      throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    logger.error("not yet implemented \"T6a CMR\" event, request[" + request + "], on session[" + session + "]");
+  }
+
+  
+  
 }

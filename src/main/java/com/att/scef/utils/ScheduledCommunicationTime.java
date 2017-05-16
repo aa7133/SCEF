@@ -1,6 +1,7 @@
 package com.att.scef.utils;
 
-import com.att.scef.gson.GScheduledCommunicationTime;;
+import com.att.scef.gson.GScheduledCommunicationTime;
+import com.att.scef.scef.SCEFRangeException;;
 
 public class ScheduledCommunicationTime extends GScheduledCommunicationTime {
 	

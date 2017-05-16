@@ -116,8 +116,9 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
   }
 
   // ----------- helper
-  public Request createRequest(AppSession session, int code, String originRealmName, String originHost) {
-    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), originRealmName);
+  /*
+  public Request createRequest(AppSession session, int code) {
+    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
 
     AvpSet reqSet = r.getAvps();
     AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
@@ -130,11 +131,12 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1); // no session maintiand
     // { Origin-Host }
     reqSet.removeAvp(Avp.ORIGIN_HOST);
-    reqSet.addAvp(Avp.ORIGIN_HOST, originHost, true);
+    reqSet.addAvp(Avp.ORIGIN_HOST, this.getStack().getMetaData().getConfiguration()
+        .getStringValue(OwnDiameterURI.ordinal(), (String) OwnDiameterURI.defValue()), true);
 
     return r;
   }  
-
+*/
   protected Request createRequest(AppSession session, int code) {
     Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
 
@@ -153,7 +155,48 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
         .getStringValue(OwnDiameterURI.ordinal(), (String) OwnDiameterURI.defValue()), true);
     return r;
   }
- 
+
+  protected Request createRequest(AppSession session, int code, String msisdn, String bearerIdentification) {
+    Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
+
+    AvpSet reqSet = r.getAvps();
+    
+    AvpSet vspec = reqSet.removeAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID);
+    AvpSet destRelm = reqSet.removeAvp(Avp.DESTINATION_REALM);
+    AvpSet origRelm = reqSet.removeAvp(Avp.ORIGIN_REALM);
+    
+    
+    AvpSet userIdentifier = reqSet.addGroupedAvp(Avp.USER_IDENTIFIER, getApplicationId().getVendorId(), true, false);
+
+    if (msisdn != null && msisdn.length() != 0) {
+      userIdentifier.addAvp(Avp.MSISDN, BCDStringConverter.toBCD(msisdn), getApplicationId().getVendorId(), true,
+          false);
+    }
+
+    reqSet.addAvp(Avp.BEARER_IDENTIFIER, bearerIdentification, true, true, true); //(Avp.BEARER_IDENTIFIER, bearerIdentification, true);
+    
+    reqSet.addAvp(vspec);
+    reqSet.addAvp(destRelm);
+    reqSet.addAvp(origRelm);
+    
+    /*
+    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+    // 1* [ Vendor-Id ]
+    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+    // 0*1{ Auth-Application-Id }
+    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    // 0*1{ Acct-Application-Id }
+    // { Auth-Session-State }
+     * 
+     */
+    reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
+    // { Origin-Host }
+    reqSet.removeAvp(Avp.ORIGIN_HOST);
+    reqSet.addAvp(Avp.ORIGIN_HOST, this.getStack().getMetaData().getConfiguration()
+        .getStringValue(OwnDiameterURI.ordinal(), (String) OwnDiameterURI.defValue()), true);
+    return r;
+  }
+
   public String getRemoteRealm() {
     return remoteRealm;
   }

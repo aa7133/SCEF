@@ -1,9 +1,11 @@
 package com.att.scef.utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
@@ -15,33 +17,68 @@ import com.att.scef.gson.GMonitoringEventConfig;
 
 public class MonitoringEventConfig extends GMonitoringEventConfig {
 	
-	public static GMonitoringEventConfig[] getNewHSSData(GHSSUserProfile hssData, List<GMonitoringEventConfig> me) {
+    public static GMonitoringEventConfig[] getChengedMonitoringData(GMonitoringEventConfig[] old, GMonitoringEventConfig[] newData, List<GMonitoringEventConfig> forDelete) {
+      List<GMonitoringEventConfig> l = new ArrayList<GMonitoringEventConfig>();
+      
+      Set<Integer> ol = new HashSet<Integer>();
+      for (GMonitoringEventConfig g : old) {
+        ol.add(g.getMonitoringType());
+      }
+      Set<Integer> nl = new HashSet<Integer>();
+      for (GMonitoringEventConfig g : newData) {
+        nl.add(g.getMonitoringType());
+      }
+      
+      Set<Integer> delete = new HashSet<Integer>(ol);
+      delete.retainAll(nl);
+      
+      Set<Integer> newM = new HashSet<Integer>(nl);
+      newM.removeAll(ol);
+      
+
+      Set<Integer> union = new HashSet<Integer>(newM);
+      union.addAll(delete);
+      
+      Set<Integer> symmetricDiff = new HashSet<Integer>(union);
+      symmetricDiff.addAll(ol);
+      Set<Integer> tmp = new HashSet<Integer>(union);
+      tmp.retainAll(ol);
+      symmetricDiff.removeAll(tmp);
+      
+      
+      return null;
+    }
+    
+    
+	public static GMonitoringEventConfig[] getNewHSSData(GHSSUserProfile hssData, List<GMonitoringEventConfig> me, List<GMonitoringEventConfig> deleted) {
 		List<Integer> scefRefIdList = MonitoringEventConfig.getScefRefIdList(me);
-		List<Integer> scefRefidForDelitionList = MonitoringEventConfig.getScefRefIdForDelitionList(me);
+		List<Integer> scefRefidForDelitionList = MonitoringEventConfig.getScefRefIdForDelitionList(deleted);
 
 		// check and update monitoring event
 		List<GMonitoringEventConfig> lm = new ArrayList<GMonitoringEventConfig>();
 
-		for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
-			if (scefRefidForDelitionList.contains(m.scefRefId)) {
-			  
-			  continue; // it will be skipped and deleted
-			}
-
-			if (scefRefIdList.contains(m.scefRefId)) { 
-				GMonitoringEventConfig mi = me.get(scefRefIdList.indexOf(m.scefRefId));
-				lm.add(mi);
-			} else { // add new to hss data and we need to maintain the old
-				m.scefRefIdForDelition = null;
-				// add the old tested since it was not deleted
-				lm.add(m);
-				// add the new tested one
-				GMonitoringEventConfig mi = me.get(scefRefIdList.indexOf(m.scefRefId));
-				lm.add(mi);
-			}
+		// remove all taht need to be delete
+		if (scefRefidForDelitionList != null) {
+		  for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
+		    if (scefRefidForDelitionList.contains(m.scefRefId)) {
+		      continue; // it will be skipped and deleted
+		    }
+		    lm.add(m);
+		  }		
 		}
-		
-		GMonitoringEventConfig[] la = new GMonitoringEventConfig[lm.size()];
+		// add the new one
+        if (me != null) {
+          for (GMonitoringEventConfig g : me) {
+            g.scefRefIdForDelition = null;
+            lm.add(g);
+          }
+        }
+
+        GMonitoringEventConfig[] la = new GMonitoringEventConfig[lm.size()];
+        for (int i = 0; i < lm.size(); i++) {
+          la[i] = lm.get(i);
+        }
+        
 		for (int i = 0; i < lm.size(); i++) {
 		  la[i] = lm.get(i);
 		}

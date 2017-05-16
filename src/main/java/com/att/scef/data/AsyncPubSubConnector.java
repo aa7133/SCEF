@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.att.scef.scef.SCEF;
-import com.att.scef.utils.ScefPubSubListener;
+import com.att.scef.scef.ScefPubSubListener;
 import com.lambdaworks.redis.RedisFuture;
 import com.lambdaworks.redis.RedisURI;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
@@ -71,7 +71,6 @@ public class AsyncPubSubConnector extends DataConnectorImpl {
 		this.handler = this.connection.async();
 		
 		RedisFuture<Void> future = this.handler.subscribe(channel);
-		
 		try {
 			future.get();
 		} catch (InterruptedException e) {

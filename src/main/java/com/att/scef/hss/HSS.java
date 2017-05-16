@@ -151,9 +151,11 @@ public class HSS {
 		
 
 		try {
+          logger.info("=================================== S6t ==============================");
           this.s6tServer.init(DEFAULT_S6T_SERVER_NAME);
           this.s6tServer.start();
-
+          
+          logger.info("=================================== S6a ==============================");
           this.s6aServer.init(DEFAULT_S6A_SERVER_NAME);
           this.s6aServer.start();
 		} catch (Exception e) {
@@ -238,6 +240,7 @@ public class HSS {
 		GUserIdentifier uid;
 		List<GAESE_CommunicationPattern> aeseComPattern = new ArrayList<GAESE_CommunicationPattern>();
 		List<GMonitoringEventConfig> monitoringEvent = new ArrayList<GMonitoringEventConfig>();;
+        List<GMonitoringEventConfig> forDelete = new ArrayList<GMonitoringEventConfig>();
 
 		JsonParser parser = new JsonParser();
 		GHSSUserProfile hssData = null;
@@ -267,12 +270,28 @@ public class HSS {
 			if (AESECommPatternAvp != null)  {
 				aeseComPattern = AESE_CommunicationPattern.extractFromAvp(AESECommPatternAvp);	
 			}
+			
+			
 			AvpSet monitoringEventConfig = reqSet.getAvps(Avp.MONITORING_EVENT_CONFIGURATION);
 			if (monitoringEventConfig != null) {
 				monitoringEvent = MonitoringEventConfig.extractFromAvp(monitoringEventConfig);
-				for (GMonitoringEventConfig m : monitoringEvent) {
+	            List<GMonitoringEventConfig> mcCopy = new ArrayList<GMonitoringEventConfig>();
+	            for (GMonitoringEventConfig g : monitoringEvent) {
+	              mcCopy.add(g);
+	            }
+				for (GMonitoringEventConfig m : mcCopy) {
 				  logger.info("Monitoring Type = " + m.getMonitoringType());
+				  if (m.getScefRefIdForDelition() != null) {
+				    forDelete.add(m);
+				    monitoringEvent.remove(m);
+				    for (int i : m.getScefRefIdForDelition()) {
+				      logger.info("for delete = " + i);
+				    }
+				  }
 				}
+			}
+			else {
+			  logger.error("No Monitoring-Event-Config Avp's");
 			}
 
 			if (newUser) {
@@ -288,13 +307,38 @@ public class HSS {
 	            String value = future.get(5, TimeUnit.MILLISECONDS);
 	            hssData = new Gson().fromJson(parser.parse(value), GHSSUserProfile.class);
 
-	            hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent));
+	            GMonitoringEventConfig[] oldMonitoring = hssData.getMonitoringConfig();
+	            if (logger.isInfoEnabled()) {
+	              for (GMonitoringEventConfig g : oldMonitoring) {
+	                logger.info("Old monitoring types = " + g.getMonitoringType());
+	              }
+	            }
+
+                for (GMonitoringEventConfig m : monitoringEvent) {
+                  logger.info("New Monitoring Type = " + m.getMonitoringType());
+                }
+                if (forDelete != null) {
+                  for (GMonitoringEventConfig m : forDelete) {
+                    logger.info("New Monitoring Type = " + m.getMonitoringType());
+                  }
+                }
+
+/**	            
+	            GMonitoringEventConfig[] changedMonirtoring =  MonitoringEventConfig.getChengedMonitoringData(
+	                oldMonitoring, monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]),forDelete);
+	            
+	            if (logger.isInfoEnabled()) {
+	              for (GMonitoringEventConfig g : changedMonirtoring) {
+	                logger.info("Changed monitoring types = " + g.getMonitoringType());
+	              }
+	            }
+*/
+	            hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent, forDelete));
 
 	            //update new data to hss
 	            hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
 	            logger.info("Setting the MME address to : " + this.s6aServer.getRemoteRealm());
 	            hssData.setMMEAdress(this.s6aServer.getRemoteRealm());
-                logger.info("CIR 4.1");
 	 		}
 	        
             for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
@@ -323,7 +367,7 @@ public class HSS {
     		
     		// we have MME 
     		//TODO remove renmarks
-    		this.s6aServer.sendIDRRequest(hssData, mmeAddress);
+    		this.s6aServer.sendIDRRequest(hssData, forDelete, mmeAddress);
 	   	 
     		this.s6tServer.sendRIR();
     		

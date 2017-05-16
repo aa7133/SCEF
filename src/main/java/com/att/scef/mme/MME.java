@@ -1,8 +1,13 @@
 package com.att.scef.mme;
 
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
@@ -41,18 +46,34 @@ import org.slf4j.LoggerFactory;
 
 import com.att.scef.data.AsyncDataConnector;
 import com.att.scef.data.ConnectorImpl;
+import com.att.scef.data.DataConnectorImpl;
 import com.att.scef.data.SyncDataConnector;
+import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.hss.HSS;
+import com.att.scef.scef.ScefPubSubListener;
+import com.att.scef.utils.LocationInformationConfiguration;
+import com.att.scef.utils.UE_ReachabilityConfiguration;
+import com.lambdaworks.redis.RedisClient;
+import com.lambdaworks.redis.RedisFuture;
+import com.lambdaworks.redis.RedisURI;
 import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
 import com.lambdaworks.redis.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
+import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
+import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
 
 public class MME {
-  protected final Logger logger = LoggerFactory.getLogger(HSS.class);
+  protected final Logger logger = LoggerFactory.getLogger(MME.class);
 
   private ConnectorImpl syncDataConnector;
   private ConnectorImpl asyncDataConnector;
+ 
+  private RedisClient redisClient;
   private RedisStringAsyncCommands<String, String> asyncHandler;
   private RedisStringCommands<String, String> syncHandler;
+
+  private StatefulRedisPubSubConnection<String, String> connection;
+  private RedisPubSubAsyncCommands<String, String> handler;
 
   private S6aClient s6aClient;
   private T6aClient t6aClient;
@@ -72,7 +93,7 @@ public class MME {
     String dictionaryFile = DEFAULT_DICTIONARY_FILE;
     String host = "127.0.0.1";
     int port = 6379;
-    String channel = "";
+    String channel = "MME-Clients";
     
     
     for (int i = 0; i < args.length; i += 2) {
@@ -108,8 +129,30 @@ public class MME {
 
       syncDataConnector = new ConnectorImpl();
       syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
+      
+      //Redis pub sub
+      this.redisClient = RedisClient.create(RedisURI.Builder.redis(host, port).build());
+      this.connection = this.redisClient.connectPubSub();
 
+      MmePubSubListener<String, String> listner = this.getListner(); 
 
+      // subscribe the listener for the pub sub
+      this.connection.addListener(listner);
+
+      this.handler = this.connection.async();
+      
+      // connect to the publisher
+      RedisFuture<Void> future = this.handler.subscribe(channel);
+      
+      try {
+          future.get();
+      } catch (InterruptedException e) {
+          e.printStackTrace();
+      } catch (ExecutionException e) {
+          e.printStackTrace();
+      }
+      
+      
       this.s6aClient = new S6aClient(this, s6aConfigFile);
       this.t6aClient = new T6aClient(this, t6aConfigFile);
       
@@ -138,6 +181,92 @@ public class MME {
 
   }
   
+  private void handleMmeMessages(String channel, String message) {
+    if (logger.isInfoEnabled()) {
+      logger.info(new StringBuffer("message = \"").append(message).append("\" for channel = ")
+          .append(channel).toString());
+    }
+    String[] paramters = message.trim().split("\\|");
+    for (String s : paramters) {
+      logger.info(s);
+    }
+    
+    switch (paramters[0].toUpperCase()) {
+    case "D":
+      String msisdn = paramters[1];
+      String msg = paramters[2];
+      logger.info("Msisdn = " + msisdn + " Message = " + msg);
+      this.t6aClient.sendODR(msisdn, msg);
+      break;
+    default:
+      logger.error("Wrong command request" + paramters[0]);
+    }
+  }
+
+  private void handleMmeMessages(String pattern, String channel, String message) {
+    if (logger.isInfoEnabled()) {
+      logger.info(new StringBuffer("message = \"").append(message).append("\" for channel = ")
+          .append(channel).append(" pattern = ").append(pattern).toString());
+    }
+  }
+
+  private MmePubSubListener<String, String> getListner() {
+    MmePubSubListener<String, String> listener = new MmePubSubListener<String, String>() {
+      @Override
+      public void message(String channel, String message) {
+        if (logger.isInfoEnabled()) {
+          logger.info(new StringBuffer("Got Message from Redis PubSub on channel : ").append(channel)
+                  .append(" Message = ").append(message).toString());
+        }
+        this.mmeContext.handleMmeMessages(channel, message);
+      }
+
+      @Override
+      public void message(String pattern, String channel, String message) {
+        //TODO 
+        if (logger.isInfoEnabled()) {
+            logger.info(new StringBuffer("Got Message from Redis PubSub with pattern : ").append(pattern).append(" on channel : ").append(channel)
+                    .append(" Message = ").append(message).toString());
+        }
+        this.mmeContext.handleMmeMessages(pattern, channel, message);
+      }
+
+      @Override
+      public void subscribed(String channel, long count) {
+        if (logger.isInfoEnabled()) {
+          logger.info(new StringBuffer("subscribed from Redis PubSub channel : ").append(channel).append(" count :").append(count)
+                  .toString());
+        }
+      }
+
+      @Override
+      public void psubscribed(String pattern, long count) {
+        if (logger.isInfoEnabled()) {
+          logger.info(new StringBuffer("psubscribed from Redis PubSub pattern : ").append(pattern).append(" count :").append(count)
+                  .toString());
+        }
+      }
+
+      @Override
+      public void unsubscribed(String channel, long count) {
+        if (logger.isInfoEnabled()) {
+          logger.info(new StringBuffer("unsubscribed from Redis PubSub channel : ").append(channel).append(" count :").append(count)
+                  .toString());
+        }
+      }
+
+      @Override
+      public void punsubscribed(String pattern, long count) {
+        if (logger.isInfoEnabled()) {
+          logger.info(new StringBuffer("punsubscribed from Redis PubSub pattern : ").append(pattern).append(" count :").append(count)
+                  .toString());
+        }
+      }
+    };
+    listener.setMmeContext(this);
+    return listener;
+  }
+  
   public void handleOtherEvent(AppSession session, AppRequestEvent request, AppAnswerEvent answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("Received \"S6a Other\" event, request[" + request + "], answer[" + answer + "], on session["
@@ -155,8 +284,96 @@ public class MME {
       logger.info("Got Insert-Subscriber-Information-Request (IDR)");
     }
     AvpSet reqSet = request.getMessage().getAvps();
+    Avp subsAvp = reqSet.getAvp(Avp.SUBSCRIPTION_DATA);
+
+    try {
+      AvpSet subsSet = subsAvp.getGrouped();
+      
+      Avp msisdnAvp = subsSet.getAvp(Avp.USER_NAME);
+      if (msisdnAvp == null) {
+          logger.error("Missing user name in Insert Subscriber Data request (IDR)");
+        this.s6aClient.sendIDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+      String msisdn = msisdnAvp.getUTF8String();
+      
+      AvpSet monitoringEventConfig = subsSet.getAvps(Avp.MONITORING_EVENT_CONFIGURATION);
+      StringBuffer sb = new StringBuffer("MONITORING_EVENT_CONFIGURATION list :");
+      
+      List<GMonitoringEventConfig> monitoringConfigList = new ArrayList<GMonitoringEventConfig>();
+      boolean skipFlag = false;
+      
+      for (Avp mon : monitoringEventConfig) {
+        GMonitoringEventConfig gmon = new GMonitoringEventConfig();
+        sb.append("\n");
+        for (Avp a: mon.getGrouped()) {
+          if(a.getCode() == Avp.SCEF_ID) {
+            gmon.setScefId(a.getDiameterIdentity());
+            sb.append("SCEF_ID = ").append(gmon.getScefId()).append("\n");
+          }
+          else if (a.getCode() == Avp.SCEF_REFERENCE_ID) {
+            gmon.setScefRefId(a.getInteger32());
+            sb.append("SCEF_REFERENCE_ID = ").append(gmon.getScefRefId()).append("\n");
+          }
+          else if (a.getCode() == Avp.MONITORING_TYPE) {
+            gmon.setMonitoringType(a.getInteger32());
+            sb.append("MONITORING_TYPE = ").append(gmon.getMonitoringType()).append("\n");
+          }
+          else if (a.getCode() == Avp.SCEF_REFERENCE_ID_FOR_DELETION) {
+            skipFlag = true;
+            sb.append("SCEF_REFERENCE_ID_FOR_DELETION = ").append(a.getInteger32()).append("\n");
+          }
+          else if (a.getCode() == Avp.MAXIMUM_NUMBER_OF_REPORTS) {
+            gmon.setMaximumNumberOfReports(a.getInteger32());
+            sb.append("MAXIMUM_NUMBER_OF_REPORTS = ").append(gmon.getMaximumNumberOfReports()).append("\n");
+          }
+          else if (a.getCode() == Avp.MONITORING_DURATION) {
+            gmon.setMonitoringDuration(new String(a.getOctetString()));
+            sb.append("MONITORING_DURATION = ").append(gmon.getMonitoringDuration()).append("\n");
+          }
+          else if (a.getCode() == Avp.CHARGED_PARTY) {
+            gmon.setChargedParty(a.getUTF8String());
+            sb.append("CHARGED_PARTY = ").append(gmon.getChargedParty()).append("\n");
+          }
+          else if (a.getCode() == Avp.MAXIMUM_DETECTION_TIME) {
+            gmon.setMaximumDetectionTime(a.getInteger32());
+            sb.append("MAXIMUM_DETECTION_TIME = ").append(gmon.getMaximumDetectionTime()).append("\n");
+          }
+          else if (a.getCode() == Avp.UE_REACHABILITY_CONFIGURATION) {
+            gmon.setUEReachabilityConfiguration(UE_ReachabilityConfiguration.extractFromAvpSingle(a));
+            sb.append("UE_REACHABILITY_CONFIGURATION = ").append(gmon.getUEReachabilityConfiguration()).append("\n");
+          }
+          else if (a.getCode() == Avp.LOCATION_INFORMATION_CONFIGURATION) {
+            gmon.setLocationInformationConfiguration(LocationInformationConfiguration.extractFromAvpSingle(a));
+            sb.append("LOCATION_INFORMATION_CONFIGURATION = ").append(gmon.getLocationInformationConfiguration()).append("\n");
+          }
+          else if (a.getCode() == Avp.ASSOCIATION_TYPE) {
+            gmon.setAssociationType(a.getInteger32());
+            sb.append("ASSOCIATION_TYPE = ").append(gmon.getAssociationType()).append("\n");
+          }
+        }
+        if (!skipFlag) {
+          monitoringConfigList.add(gmon);
+        }
+      }
+      
+      GMonitoringEventConfig[] monitoringConfigArray = new GMonitoringEventConfig[monitoringConfigList.size()];
+      int i = 0;
+      for (GMonitoringEventConfig g : monitoringConfigList) {
+        monitoringConfigArray[i++] = g;
+      }
+      
+      if (logger.isInfoEnabled()) {
+        logger.info(sb.toString());
+      }
+    } catch (AvpDataException e) {
+        e.printStackTrace();
+    }
     
-    s6aClient.sendIDA(session, request, ResultCode.SUCCESS);
+    this.s6aClient.sendIDA(session, request, ResultCode.SUCCESS);
+    
+    //TODO add user data to data base based on MSISDN
+    
   }
 
   public void handleDeleteSubscriberDataRequestEvent(ClientS6aSession session, JDeleteSubscriberDataRequest request)
@@ -220,8 +437,12 @@ public class MME {
 
   public void handleMO_DataAnswerEvent(ClientT6aSession session, JMO_DataRequest request, JMO_DataAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("Received \"T6a ODA\" event, request[" + request + "], answer[" + answer + "], on session["
-        + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got MO-Data-Answer (ODA)");
+    }
+    AvpSet reqSet = request.getMessage().getAvps();
+    AvpSet ansSet = answer.getMessage().getAvps();
+    
   }
 
   public void handleMT_DataRequestEvent(ClientT6aSession session, JMT_DataRequest request)

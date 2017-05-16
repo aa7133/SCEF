@@ -3,9 +3,8 @@
  * since we are in different thread when we get the RedisPubSubListener call backs
  * 
  */
-package com.att.scef.utils;
+package com.att.scef.scef;
 
-import com.att.scef.scef.SCEF;
 import com.lambdaworks.redis.pubsub.RedisPubSubListener;
 
 public abstract class ScefPubSubListener<K, V> implements RedisPubSubListener<K, V> {

@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.att.scef.scef.SCEF;
-import com.att.scef.utils.ScefPubSubListener;
+import com.att.scef.scef.ScefPubSubListener;
 import com.lambdaworks.redis.RedisURI;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
 import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
@@ -29,7 +29,7 @@ public class SyncPubSubConnector extends DataConnectorImpl {
 		super(uri);
 		this.connection = getRedisClient().connectPubSub();
 		
-		ScefPubSubListener<String, String> listner = new ScefPubSubListener<String, String>() {
+		ScefPubSubListener<String, String> scefListner = new ScefPubSubListener<String, String>() {
 			@Override
 			public void unsubscribed(String channel, long count) {
 			}
@@ -61,9 +61,9 @@ public class SyncPubSubConnector extends DataConnectorImpl {
 			}
 		};
 		
-		listner.setScefContext(scef);
+		scefListner.setScefContext(scef);
 		
-		this.connection.addListener(listner);
+		this.connection.addListener(scefListner);
 
 		this.handler = this.connection.sync();
 		

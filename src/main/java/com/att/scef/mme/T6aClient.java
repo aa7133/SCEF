@@ -3,6 +3,8 @@ package com.att.scef.mme;
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
+import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.NetworkReqListener;
@@ -23,10 +25,12 @@ import org.jdiameter.api.t6a.events.JMO_DataRequest;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
+import org.jdiameter.common.impl.app.t6a.JMO_DataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.att.scef.interfaces.T6aAbstractClient;
+import com.att.scef.utils.BCDStringConverter;
 
 
 public class T6aClient extends T6aAbstractClient {
@@ -43,6 +47,45 @@ public class T6aClient extends T6aAbstractClient {
   
   public void init(String clientID) throws Exception {
       this.init(new FileInputStream(configFile), clientID);
+  }
+  
+  public void sendODR(String msisdn, String msg) {
+    if (logger.isInfoEnabled()) {
+      logger.info("Send ODR to SCEF");
+    }
+
+    try {
+      ClientT6aSession clientT6aSession = this.sessionFactory.getNewAppSession(getApplicationId(),
+          ClientT6aSession.class);
+      JMO_DataRequest odr = new JMO_DataRequestImpl(super.createRequest(clientT6aSession, JMO_DataRequest.code, msisdn, "Bearer-ID1"));
+
+      AvpSet reqSet = odr.getMessage().getAvps();
+      
+
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
+      
+      reqSet.addAvp(Avp.NON_IP_DATA, msg, false);
+
+
+      clientT6aSession.sendMODataRequest(odr);
+
+    } catch (InternalException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (RouteException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+
+    if (logger.isInfoEnabled()) {
+      logger.info("Sent ODR to SCEF");
+    }
   }
 
   @Override

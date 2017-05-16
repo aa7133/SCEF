@@ -1,4 +1,4 @@
-package com.att.scef.utils;
+package com.att.scef.scef;
 
 import java.util.Random;
 
