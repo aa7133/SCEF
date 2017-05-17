@@ -28,7 +28,6 @@ import org.jdiameter.api.s6a.events.JPurgeUERequest;
 import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
-import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +39,7 @@ import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.interfaces.S6aAbstractServer;
 
 public class S6aServer extends S6aAbstractServer {
-  protected final Logger logger = LoggerFactory.getLogger(S6tServer.class);
+  protected final Logger logger = LoggerFactory.getLogger(S6aServer.class);
   private HSS hss;
 
   private String configFile;
@@ -63,8 +62,6 @@ public class S6aServer extends S6aAbstractServer {
         monitoringEvCon = userData.addGroupedAvp(Avp.MONITORING_EVENT_CONFIGURATION, vendorId,true, false);
         monitoringEvCon.addAvp(Avp.SCEF_ID, mo.getScefId(), vendorId, true, false, true);
         
-        logger.info("buildUserDataAvp Monitoring Type = " + mo.getMonitoringType());
-        
         monitoringEvCon.addAvp(Avp.MONITORING_TYPE, mo.getMonitoringType(), vendorId, true, false);
 
         if (mo.getScefRefId() != 0) {
@@ -81,7 +78,7 @@ public class S6aServer extends S6aAbstractServer {
         logger.info("buildUserDataAvp Monitoring Type  for delition= " + g.getMonitoringType());
         
         monitoringEvCon.addAvp(Avp.MONITORING_TYPE, g.getMonitoringType(), vendorId, true, false);
-        for (int i :g.getScefRefIdForDelition()) {
+        for (long i :g.getScefRefIdForDelition()) {
           monitoringEvCon.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i);
         }
       }
@@ -155,6 +152,7 @@ public class S6aServer extends S6aAbstractServer {
         //reqSet.addAvp(Avp.DESTINATION_REALM, this.getRemoteRealm(), true);
         // { User-Name }
         //TODO fix imsi later
+        logger.info("MSISDN = " + hssData.getMsisdn());
         reqSet.addAvp(Avp.USER_NAME, hssData.getMsisdn(), false);
         // *[ Supported-Features]
         // { Subscription-Data}

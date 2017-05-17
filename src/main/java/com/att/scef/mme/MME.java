@@ -46,13 +46,13 @@ import org.slf4j.LoggerFactory;
 
 import com.att.scef.data.AsyncDataConnector;
 import com.att.scef.data.ConnectorImpl;
-import com.att.scef.data.DataConnectorImpl;
 import com.att.scef.data.SyncDataConnector;
+import com.att.scef.gson.GMmeUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
-import com.att.scef.hss.HSS;
-import com.att.scef.scef.ScefPubSubListener;
 import com.att.scef.utils.LocationInformationConfiguration;
 import com.att.scef.utils.UE_ReachabilityConfiguration;
+import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisFuture;
 import com.lambdaworks.redis.RedisURI;
@@ -60,7 +60,6 @@ import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
 import com.lambdaworks.redis.api.sync.RedisStringCommands;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
 import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
-import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
 
 public class MME {
   protected final Logger logger = LoggerFactory.getLogger(MME.class);
@@ -85,7 +84,10 @@ public class MME {
   private final static String DEFAULT_S6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/mme/config-mme-s6a.xml";
   private final static String DEFAULT_T6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/mme/config-mme-t6a.xml";
   private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
-  
+
+  private final static String DEFAULT_PROFILE_PREFIX = "MME-USER-";
+  private final static int ACTIVE = 1;
+  private final static int NOT_ACTIVE = 0;
   
   public static void main(String[] args) {
     String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
@@ -190,18 +192,86 @@ public class MME {
     for (String s : paramters) {
       logger.info(s);
     }
-    
+    String msisdn = paramters[1];
+    if (msisdn == null || msisdn.length() == 0) {
+      logger.error("empty msisdn");
+      return;
+    }
+    String userData = this.syncHandler.get(DEFAULT_PROFILE_PREFIX + msisdn);
+   
     switch (paramters[0].toUpperCase()) {
     case "D":
-      String msisdn = paramters[1];
       String msg = paramters[2];
-      logger.info("Msisdn = " + msisdn + " Message = " + msg);
       this.t6aClient.sendODR(msisdn, msg);
       break;
+    case "A":
+      int activeState = Integer.parseInt(paramters[2]);
+      changeActiveState(msisdn, userData, activeState);
+      break;
+    case "M":
+      int monitorEvent = Integer.parseInt(paramters[2]);
+      if (monitorEvent > 7 || monitorEvent < 0) {
+        logger.error("monitoring not in range use number between 0 - 7");
+      }
+      sendMonitoringEvent(msisdn, userData, monitorEvent);
+      break;
     default:
-      logger.error("Wrong command request" + paramters[0]);
+      StringBuffer sb = new StringBuffer();
+      logger.error("Wrong command request" + paramters[0] + " for message : "+ message);
+      sb.append("send data from device \"D|msisdn|message\"\n")
+           .append("Change device State \"A|msisdn|[0,1]\"  0 - deactivate device 1 - activate device\n")
+           .append("Send Monitoring Event \"M|msisdn|[0-7]\"  \n\t\tLOSS_OF_CONNECTIVITY (0)\n\t\tUE_REACHABILITY (1)\n\t\t")
+           .append("LOCATION_REPORTING (2)\n\t\tCHANGE_OF_IMSI_IMEI(SV)_ASSOCIATION (3)\n\t\tROAMING_STATUS (4)\n\t\t")
+           .append("COMMUNICATION_FAILURE (5)\n\t\tAVAILABILITY_AFTER_DDN_FAILURE (6)\n\t\tNUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA (7)");
+      logger.info(sb.toString());
+      
     }
   }
+
+  private void sendMonitoringEvent(String msisdn, String userData, int monitoringEvent) {
+    if (userData == null) {
+      logger.error("sendMonitoringEvent User not exists : " + msisdn);
+      return;
+    }
+    GMmeUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
+    if (userProfile.getActive() == NOT_ACTIVE) {
+      logger.info("user not in active state");
+      return;
+    }
+    GMonitoringEventConfig gmon = null;
+    for (GMonitoringEventConfig g : userProfile.getMonitoringEvents()) {
+      if (g.getMonitoringType() == monitoringEvent) {
+        gmon = g;
+      }
+    }
+    if (gmon == null) {
+      logger.info(new StringBuffer("The requested monitoring flag : ").append(monitoringEvent)
+          .append("Was not set for the user : ").append(msisdn).toString());
+      return;
+    }
+    this.t6aClient.sendRIR(msisdn, gmon, monitoringEvent);       
+  }
+
+  private void changeActiveState(String msisdn, String userData, int activeState) {
+    if (userData == null) {
+      logger.error("User not exists" + msisdn);
+      return;
+    }
+    RedisFuture<String> future = null;
+    Runnable listener = new Runnable() {
+      @Override
+      public void run() {
+        logger.info("MME active state changed");
+      }
+    };
+
+    GMmeUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
+    userProfile.setActive(activeState);
+    future = this.asyncHandler.set(msisdn, new Gson().toJson(userProfile));
+
+    future.thenRun(listener);    
+  }
+  
 
   private void handleMmeMessages(String pattern, String channel, String message) {
     if (logger.isInfoEnabled()) {
@@ -284,18 +354,26 @@ public class MME {
       logger.info("Got Insert-Subscriber-Information-Request (IDR)");
     }
     AvpSet reqSet = request.getMessage().getAvps();
-    Avp subsAvp = reqSet.getAvp(Avp.SUBSCRIPTION_DATA);
+
+    RedisFuture<String> future = null;
+    Runnable listener = new Runnable() {
+      @Override
+      public void run() {
+        logger.info("MME data inserted");
+      }
+    };
 
     try {
-      AvpSet subsSet = subsAvp.getGrouped();
-      
-      Avp msisdnAvp = subsSet.getAvp(Avp.USER_NAME);
+      Avp msisdnAvp = reqSet.getAvp(Avp.USER_NAME);
       if (msisdnAvp == null) {
           logger.error("Missing user name in Insert Subscriber Data request (IDR)");
         this.s6aClient.sendIDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
         return;
       }
       String msisdn = msisdnAvp.getUTF8String();
+      String userData = this.syncHandler.get(DEFAULT_PROFILE_PREFIX + msisdn);   
+
+      AvpSet subsSet = reqSet.getAvp(Avp.SUBSCRIPTION_DATA).getGrouped();
       
       AvpSet monitoringEventConfig = subsSet.getAvps(Avp.MONITORING_EVENT_CONFIGURATION);
       StringBuffer sb = new StringBuffer("MONITORING_EVENT_CONFIGURATION list :");
@@ -321,7 +399,7 @@ public class MME {
           }
           else if (a.getCode() == Avp.SCEF_REFERENCE_ID_FOR_DELETION) {
             skipFlag = true;
-            sb.append("SCEF_REFERENCE_ID_FOR_DELETION = ").append(a.getInteger32()).append("\n");
+            sb.append("SCEF_REFERENCE_ID_FOR_DELETION = ").append(a.getUnsigned32()).append("\n");
           }
           else if (a.getCode() == Avp.MAXIMUM_NUMBER_OF_REPORTS) {
             gmon.setMaximumNumberOfReports(a.getInteger32());
@@ -363,6 +441,19 @@ public class MME {
         monitoringConfigArray[i++] = g;
       }
       
+      GMmeUserProfile userProfile = null;
+      if (userData == null) {
+        userProfile = new GMmeUserProfile();
+        userProfile.setActive(ACTIVE);
+      }
+      else {
+        userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
+      }
+      userProfile.setMonitoringEvents(monitoringConfigArray);
+      String buf = new Gson().toJson(userProfile);
+      future = this.asyncHandler.set(DEFAULT_PROFILE_PREFIX + msisdn, buf /*new Gson().toJson(userProfile)*/);
+      logger.info("saving user :" + DEFAULT_PROFILE_PREFIX + msisdn + "--" + buf);
+      
       if (logger.isInfoEnabled()) {
         logger.info(sb.toString());
       }
@@ -373,6 +464,7 @@ public class MME {
     this.s6aClient.sendIDA(session, request, ResultCode.SUCCESS);
     
     //TODO add user data to data base based on MSISDN
+    future.thenRun(listener);
     
   }
 

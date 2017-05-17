@@ -6,43 +6,30 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.jdiameter.api.Answer;
-import org.jdiameter.api.ApplicationId;
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.Mode;
-import org.jdiameter.api.Network;
 import org.jdiameter.api.OverloadException;
-import org.jdiameter.api.Request;
 import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
-import org.jdiameter.api.app.StateChangeListener;
 import org.jdiameter.api.s6t.ClientS6tSession;
-import org.jdiameter.api.s6t.ClientS6tSessionListener;
-import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.api.s6t.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
 import org.jdiameter.api.s6t.events.JNIDDInformationAnswer;
 import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
 import org.jdiameter.api.t6a.ServerT6aSession;
-import org.jdiameter.api.t6a.ServerT6aSessionListener;
 import org.jdiameter.api.t6a.events.JConnectionManagementAnswer;
 import org.jdiameter.api.t6a.events.JConnectionManagementRequest;
 import org.jdiameter.api.t6a.events.JMO_DataRequest;
 import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
-import org.jdiameter.client.api.ISessionFactory;
-import org.jdiameter.common.impl.app.s6t.S6tSessionFactoryImpl;
-import org.jdiameter.common.impl.app.t6a.T6aSessionFactoryImpl;
-import org.jdiameter.server.impl.app.s6t.S6tServerSessionImpl;
-import org.jdiameter.server.impl.app.t6a.T6aServerSessionImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,18 +38,15 @@ import com.att.scef.data.AsyncPubSubConnector;
 import com.att.scef.data.ConnectorImpl;
 import com.att.scef.data.PubSubConnectorImpl;
 import com.att.scef.data.SyncDataConnector;
-import com.att.scef.data.SyncPubSubConnector;
-import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.gson.GUserIdentifier;
-import com.att.scef.interfaces.AbstractServer;
-import com.att.scef.utils.BCDStringConverter;
 import com.att.scef.utils.MonitoringType;
 import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.lambdaworks.redis.RedisFuture;
+import com.lambdaworks.redis.SetArgs;
 import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
 import com.lambdaworks.redis.api.sync.RedisStringCommands;
 import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
@@ -97,6 +81,8 @@ public class SCEF {
     private S6tClient s6tClient;
     private T6aServer t6aServer;
     
+    private final static String SCEF_REF_ID_PREFIX = "SCEF-REF-ID-";
+    private final static String SCEF_MSISDN_PREFIX = "SCEF-MSISDN-";
 	
     public static void main(String[] args) {
     	String s6tCconfigFile = DEFAULT_S6T_CONFIG_FILE;
@@ -183,6 +169,7 @@ public class SCEF {
 		RedisFuture<String> setScefExternId = null;
         RedisFuture<String> setScefMsisdn = null;
         RedisFuture<String> setScefUserName = null;
+        List<RedisFuture<String>> setScefRefId = new ArrayList<RedisFuture<String>>();
 		
 		Runnable listener = new Runnable() {
 		    @Override
@@ -194,7 +181,7 @@ public class SCEF {
 		    	*/
 		    }
 		};
-		
+
 		// get the MSISDN from the SCEF external id to MSISDN table.
 		// if not exists so this is new user and we need to set the tables
 		String msisdn =  this.getSyncHandler().get("SCEF-Extern-ID-" + newMsg.getExternalId());
@@ -203,15 +190,22 @@ public class SCEF {
 			if (logger.isInfoEnabled()) {
 				logger.info("**** got a message for new user : " + msg);
 			}
+			msisdn = newMsg.getMsisdn();
 			
 			// translate to monitoring type list all requested monitoring flags
 			List<Integer> ml = MonitoringType.getMonitorinTypeList(newMsg.getMonitoringFlags());
 			GMonitoringEventConfig[] mc = new GMonitoringEventConfig[ml.size()];
-			
+
+
 			for (int i = 0; i < ml.size(); i++) {
 				mc[i] = new GMonitoringEventConfig();
 				mc[i].setMonitoringType(ml.get(i));
-				mc[i].setScefRefId(ml.get(i));
+				int scefRefId = SCEF_Reference_ID_Generator.getSCEFRefID();
+				mc[i].setScefRefId(scefRefId);
+                setScefRefId.add(this.getAsyncHandler().set(SCEF_REF_ID_PREFIX + scefRefId, msisdn));
+                if (logger.isInfoEnabled()) {
+                  logger.info("SCEF ref id = " + scefRefId + " MSISDN = " + msisdn);
+                }
 				//get the SCEF address and fill the parameter from the configuration 
 				mc[i].setScefId(this.scefId);
 			}
@@ -228,7 +222,7 @@ public class SCEF {
 			}
 			
 			setScefExternId = this.getAsyncHandler().set("SCEF-Extern-ID-" + newMsg.getExternalId(), newMsg.getMsisdn());
-			setScefMsisdn = this.getAsyncHandler().set("SCEF-MSISDN-" + newMsg.getMsisdn(), new Gson().toJson(newMsg));
+			setScefMsisdn = this.getAsyncHandler().set(SCEF_MSISDN_PREFIX + newMsg.getMsisdn(), new Gson().toJson(newMsg));
 			if (newMsg.getUserName() != null && newMsg.getUserName().length() >0) {
 			  setScefUserName = this.getAsyncHandler().set("SCEF-USER-NAME-" + newMsg.getUserName(), newMsg.getMsisdn());
 			}
@@ -238,10 +232,9 @@ public class SCEF {
 			if (setScefUserName != null) {
 			  setScefUserName.thenRun(listener);
 			}
-			
 		}
 		else {
-			String data = this.getSyncHandler().get("SCEF-MSISDN-" + newMsg.getMsisdn());
+			String data = this.getSyncHandler().get(SCEF_MSISDN_PREFIX + newMsg.getMsisdn());
 			if (logger.isInfoEnabled()) {
 				logger.info(new StringBuilder("got a message for user : ")
 						.append(msisdn).append(" message = ")
@@ -253,7 +246,6 @@ public class SCEF {
 			
 			List<Integer> mapToAdd = MonitoringType.getNewMonitoringTypeList(userProfile.getMonitoringFlags(), newMsg.getMonitoringFlags());
 			List<Integer> mapToDelete = MonitoringType.getDeletedMonitoringTypeList(userProfile.getMonitoringFlags(), newMsg.getMonitoringFlags());
-			//Integer[] newMap = MonitoringType.getnextMonitoringTypeList(userProfile.getMonitoringFlags(), newMsg.getMonitoringFlags());
 			
 			userProfile.setMonitoringFlags(MonitoringType.getnextMonitoringMap(userProfile.getMonitoringFlags(), newMsg.getMonitoringFlags()));
 
@@ -263,7 +255,12 @@ public class SCEF {
 			for (; i < mapToAdd.size(); i++) {
 				mc[i] = new GMonitoringEventConfig();
 				mc[i].setMonitoringType(mapToAdd.get(i));
-				mc[i].setScefRefId(mapToAdd.get(i));
+                int scefRefId = SCEF_Reference_ID_Generator.getSCEFRefID();
+                mc[i].setScefRefId(scefRefId);
+                setScefRefId.add(this.getAsyncHandler().set(SCEF_REF_ID_PREFIX + scefRefId, msisdn));
+                if (logger.isInfoEnabled()) {
+                  logger.info("SCEF ref id = " + scefRefId);
+                }
 				mc[i].setScefId(this.scefId);
 			}
 			//current support is just for 1 SCEF ref ID so the delete will be the same.
@@ -298,7 +295,13 @@ public class SCEF {
 			List<GMonitoringEventConfig> l = new ArrayList<GMonitoringEventConfig>();
 			for (int j = 0; j < nextMap.length; j++) {
 				if (mapToDelete.contains(nextMap[j].getMonitoringType())) {
-					nextMap[j] = null;
+				  SetArgs args = new SetArgs();
+				  args.ex(3);
+				  this.getSyncHandler().set(SCEF_REF_ID_PREFIX + nextMap[j].getScefRefId(), "", args);
+				  if (logger.isInfoEnabled()) {
+				    logger.info("Removing SCEF Referancre ID : " + SCEF_REF_ID_PREFIX + nextMap[j].getScefRefId());
+				  }
+                  nextMap[j] = null;
 				}
 				else {
 					l.add(nextMap[j]);
@@ -307,7 +310,12 @@ public class SCEF {
 			for (int j : mapToAdd) {
 				GMonitoringEventConfig m = new GMonitoringEventConfig();
 				m.setMonitoringType(j);
-				m.setScefRefId(j);
+                int scefRefId = SCEF_Reference_ID_Generator.getSCEFRefID();
+                m.setScefRefId(scefRefId);
+                setScefRefId.add(this.getAsyncHandler().set(SCEF_REF_ID_PREFIX + scefRefId, String.valueOf(msisdn)));
+                if (logger.isInfoEnabled()) {
+                  logger.info("SCEF ref id = " + scefRefId);
+                }
 				m.setScefId(this.scefId);
 				l.add(m);
 			}
@@ -324,8 +332,14 @@ public class SCEF {
 			userProfile.setErrorQueue(newMsg.getErrorQueue());
 
 			
-			setScefMsisdn = this.getAsyncHandler().set("SCEF-MSISDN-" + newMsg.getMsisdn(), new Gson().toJson(userProfile));
+			setScefMsisdn = this.getAsyncHandler().set(SCEF_MSISDN_PREFIX + newMsg.getMsisdn(), new Gson().toJson(userProfile));
 			setScefMsisdn.thenRun(listener);
+
+			if (setScefRefId.size() > 0) {
+			  for (RedisFuture<String> f : setScefRefId) {
+			    f.thenRun(listener);
+			  }
+            }
 		}
 	}
 	
@@ -525,7 +539,7 @@ public class SCEF {
   public void handleReportingInformationRequestEvent(ClientS6tSession session, JReportingInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     if (logger.isInfoEnabled()) {
-      logger.info("Got RIR from ");
+      logger.info("Got RIR from HSS");
     }
     this.s6tClient.sendRIA(session, request, ResultCode.SUCCESS);
   }
@@ -601,31 +615,113 @@ public class SCEF {
     logger.error("Received \"T6a Other\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
   }
 
-  public void handleSendConfigurationInformationAnswerEvent(ServerT6aSession session,
+  public void handleT6aConfigurationInformationAnswerEvent(ServerT6aSession session,
       org.jdiameter.api.t6a.events.JConfigurationInformationRequest request, org.jdiameter.api.t6a.events.JConfigurationInformationAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("not yet implemented \"T6a CIA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
   }
 
-  public void handleSendConfigurationInformationRequestEvent(ServerT6aSession session,
+  public void handleT6aConfigurationInformationRequestEvent(ServerT6aSession session,
       org.jdiameter.api.t6a.events.JConfigurationInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("not yet implemented \"T6a CIR\" event, request[" + request + "], on session[" + session + "]");
   }
 
-  public void handleSendReportingInformationRequestEvent(ServerT6aSession session,
+  public void handleT6aReportingInformationRequestEvent(ServerT6aSession session,
       org.jdiameter.api.t6a.events.JReportingInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("not yet implemented \"T6a RIR\" event, request[" + request + "], on session[" + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got Reporting Information Request (RIR) from MME");
+    }
+    try {
+      AvpSet reqSet = request.getMessage().getAvps();
+      AvpSet monReport = reqSet.getAvps(Avp.MONITORING_EVENT_REPORT);
+      if (monReport == null) {
+        this.t6aServer.sendRIA(session, request, ResultCode.DIAMETER_ERROR_OPERATION_NOT_ALLOWED);
+      }
+      
+      for (Avp m : monReport) {
+        int scefRefId = 0;
+        int monitoringType = -1;
+        String scefID = null;
+        int reachabilityInfo = -1;
+        AvpSet epsLocation = null;
+        AvpSet commuFail = null;
+        List<AvpSet> numOfUEPerLocation = new ArrayList<AvpSet>();
+        for (Avp a : m.getGrouped()) {
+          
+          if (a.getCode() == Avp.SCEF_REFERENCE_ID) {
+            scefRefId = (int)a.getUnsigned32();
+            logger.info("SCEF_REFERENCE_ID = " + scefRefId);
+          }
+          else if (a.getCode() == Avp.SCEF_ID) {
+            scefID = a.getDiameterIdentity();
+            logger.info("SCEF_ID = " + scefID);
+          }
+          else if (a.getCode() == Avp.MONITORING_TYPE) {
+            monitoringType = a.getInteger32();
+            logger.info("Monitoring Type (" + monitoringType + ") " + MonitoringType.getMonitoringText(monitoringType));
+          }
+          else if (a.getCode() == Avp.REACHABILITY_INFORMATION) {
+            reachabilityInfo = (int)a.getUnsigned32();
+            logger.info("REACHABILITY_INFORMATION = " + reachabilityInfo);
+          }
+          else if (a.getCode() == Avp.EPS_LOCATION_INFORMATION) {
+            epsLocation = a.getGrouped();
+            Avp mmeLoc = epsLocation.getAvp(Avp.MME_LOCATION_INFORMATION);
+            Avp sgsnLoc = epsLocation.getAvp(Avp.SGSN_LOCATION_INFORMATION);
+            
+          }
+          else if (a.getCode() == Avp.COMMUNICATION_FAILURE_INFORMATION) {
+            commuFail = a.getGrouped();
+            Avp causeType = commuFail.getAvp(Avp.CAUSE_TYPE);
+          }
+          else if (a.getCode() == Avp.NUMBER_OF_UE_PER_LOCATION_REPORT) {
+            numOfUEPerLocation.add(a.getGrouped());
+          }
+        }
+        
+        String key = SCEF_REF_ID_PREFIX + scefRefId;
+        String msisdn = this.getSyncHandler().get(key);
+        if (msisdn == null || msisdn.length() == 0) {
+          logger.error("SCEF_REFERENCE_ID for user not found in DB for Key " + key);
+          this.t6aServer.sendRIA(session, request, ResultCode.INVALID_AVP_VALUE);
+          return;
+        }
+        // get the monitoring queue for the user
+        if (logger.isInfoEnabled()) {
+          logger.info("monitoring event for user : " + msisdn);
+        }
+        String data = this.getSyncHandler().get(SCEF_MSISDN_PREFIX+ msisdn);
+        if (data == null || data.length() == 0) {
+          logger.error("data not found for user : " + msisdn);
+          this.t6aServer.sendRIA(session, request, ResultCode.INVALID_AVP_VALUE);
+          return;
+        }
+        GSCEFUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
+        
+        String channel = userProfile.getMonitoroingQueue();
+        
+        if (logger.isInfoEnabled()) {
+          logger.info("Data queue for user : " + msisdn + " is : " + channel);
+        }
+       
+
+        
+      }
+
+    } catch (AvpDataException e) {
+      e.printStackTrace();
+    }
+    
   }
 
-  public void handleSendMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
+  public void handleT6aMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     if (logger.isInfoEnabled()) {
-      logger.info("Got NIDD Information Request (NIR)");
+      logger.info("Got MO Data Request (ODR) from MME");
     }
     AvpSet reqSet = request.getMessage().getAvps();
-    
     
     try {
       Avp userIdentifier = reqSet.getAvp(Avp.USER_IDENTIFIER);
@@ -636,10 +732,6 @@ public class SCEF {
           this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
           return;
       }
-      
-
-      
-      
       
       Avp bearer = reqSet.getAvp(Avp.BEARER_IDENTIFIER);
       if (bearer == null) {
@@ -669,7 +761,7 @@ public class SCEF {
       uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
       String msisdn = uid.getMsisdn();
 
-      String data = this.getSyncHandler().get("SCEF-MSISDN-" + msisdn);
+      String data = this.getSyncHandler().get(SCEF_MSISDN_PREFIX + msisdn);
 
       GSCEFUserProfile userProfile = null;
       
@@ -689,18 +781,18 @@ public class SCEF {
     this.t6aServer.sendODA(session, request, ResultCode.SUCCESS);
   }
 
-  public void handleSendMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
+  public void handleT6aMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("not yet implemented \"T6a TDA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
   }
 
-  public void handleSendConnectionManagementAnswertEvent(ServerT6aSession session, JConnectionManagementRequest request,
+  public void handleT6aConnectionManagementAnswertEvent(ServerT6aSession session, JConnectionManagementRequest request,
       JConnectionManagementAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("not yet implemented \"T6a CMA\" event, request[" + request + "], answer[" + answer + "], on session[" + session + "]");
   }
 
-  public void handleSendConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
+  public void handleT6aConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     logger.error("not yet implemented \"T6a CMR\" event, request[" + request + "], on session[" + session + "]");
   }

@@ -18,6 +18,16 @@ public class MonitoringType {
   public static final int AVAILABILITY_AFTER_DDN_FAILURE = 6;
   public static final int NUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA = 7;
   
+  public static final int  UE_REACHABILITY_REACHABLE_FOR_DATA = 1;
+  public static final int  UE_REACHABILITY_REACHABLE_FOR_SMS = 0;
+  
+  public static final int  CAUSE_TYPE_RADIO_NETWORK_LAYER = 0;
+  public static final int  CAUSE_TYPE_TRANSPORT_LAYER = 1;
+  public static final int  CAUSE_TYPE_NAS = 2;
+  public static final int  CAUSE_TYPE_PROTOCOL = 3;
+  public static final int  CAUSE_TYPE_MISCELLANEOUS = 4;
+ 
+  
   private static final int LOSS_OF_CONNECTIVITY_FLAG = 1;
   private static final int UE_REACHABILITY_FLAG = 2;
   private static final int LOCATION_REPORTING_FLAG = 4;
@@ -94,6 +104,29 @@ public class MonitoringType {
 	  
 	  return l;
 
+  }
+  
+  public static String getMonitoringText(int monitoringType) {
+    switch (monitoringType) {
+    case LOSS_OF_CONNECTIVITY:
+      return "LOSS_OF_CONNECTIVITY";
+    case UE_REACHABILITY:
+      return "UE_REACHABILITY";
+    case LOCATION_REPORTING:
+      return "LOCATION_REPORTING";
+    case CHANGE_OF_IMSI_IMEI_ASSOCIATION:
+      return "CHANGE_OF_IMSI_IMEI_ASSOCIATION";
+    case ROAMING_STATUS:
+      return "ROAMING_STATUS";
+    case COMMUNICATION_FAILURE:
+      return "COMMUNICATION_FAILURE";
+    case AVAILABILITY_AFTER_DDN_FAILURE:
+      return "AVAILABILITY_AFTER_DDN_FAILURE";
+    case NUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA:
+      return "NUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA";
+    default:
+      return null;
+    }
   }
   
 }

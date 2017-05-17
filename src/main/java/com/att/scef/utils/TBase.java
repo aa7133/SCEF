@@ -141,11 +141,14 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     Request r = session.getSessions().get(0).createRequest(code, getApplicationId(), this.getRemoteRealm());
 
     AvpSet reqSet = r.getAvps();
-    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
-    // 1* [ Vendor-Id ]
-    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
-    // 0*1{ Auth-Application-Id }
-    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    Avp vsa = reqSet.getAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID);
+    if (vsa == null) {
+      AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+      // 1* [ Vendor-Id ]
+      vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+      // 0*1{ Auth-Application-Id }
+      vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+    }
     // 0*1{ Acct-Application-Id }
     // { Auth-Session-State }
     reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
@@ -175,20 +178,22 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
 
     reqSet.addAvp(Avp.BEARER_IDENTIFIER, bearerIdentification, true, true, true); //(Avp.BEARER_IDENTIFIER, bearerIdentification, true);
     
-    reqSet.addAvp(vspec);
+    if (vspec != null) {
+      reqSet.addAvp(vspec);
+    }
+    else {
+      AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
+      // 1* [ Vendor-Id ]
+      vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
+      // 0*1{ Auth-Application-Id }
+      vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
+      // 0*1{ Acct-Application-Id }
+      
+    }
     reqSet.addAvp(destRelm);
     reqSet.addAvp(origRelm);
     
-    /*
-    AvpSet vendorSpecificApplicationId = reqSet.addGroupedAvp(Avp.VENDOR_SPECIFIC_APPLICATION_ID, 0, false, false);
-    // 1* [ Vendor-Id ]
-    vendorSpecificApplicationId.addAvp(Avp.VENDOR_ID, getApplicationId().getVendorId(), true);
-    // 0*1{ Auth-Application-Id }
-    vendorSpecificApplicationId.addAvp(Avp.AUTH_APPLICATION_ID, getApplicationId().getAuthAppId(), true);
-    // 0*1{ Acct-Application-Id }
     // { Auth-Session-State }
-     * 
-     */
     reqSet.addAvp(Avp.AUTH_SESSION_STATE, 1);
     // { Origin-Host }
     reqSet.removeAvp(Avp.ORIGIN_HOST);

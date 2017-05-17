@@ -3,7 +3,6 @@ package com.att.scef.scef;
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
-import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.NetworkReqListener;
@@ -22,8 +21,10 @@ import org.jdiameter.api.t6a.events.JMO_DataAnswer;
 import org.jdiameter.api.t6a.events.JMO_DataRequest;
 import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
+import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.jdiameter.common.impl.app.t6a.JMO_DataAnswerImpl;
+import org.jdiameter.common.impl.app.t6a.JReportingInformationAnswerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,33 +53,47 @@ public class T6aServer extends T6aAbstractServer {
       JMO_DataAnswer oda = new JMO_DataAnswerImpl((Request)request.getMessage(), resultCode);
       Answer answer = (Answer)oda.getMessage();
     
-      AvpSet set = answer.getAvps();
+      //AvpSet set = answer.getAvps();
 
       session.sendMO_DataAnswer(this.t6aSessionFactory.createMO_DataAnswer(answer));
       
     } catch (InternalException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (IllegalDiameterStateException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (RouteException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (OverloadException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     
   }
   
+  public void sendRIA(ServerT6aSession session, JReportingInformationRequest request, int resultCode) {
+    try {
+      JReportingInformationAnswer ria = new JReportingInformationAnswerImpl((Request)request.getMessage(), resultCode);
+      Answer answer = (Answer)ria.getMessage();
+      
+      session.sendReportingInformationAnswer(this.t6aSessionFactory.createReportingInformationAnswer(answer));
+    } catch (InternalException e) {
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      e.printStackTrace();
+    } catch (RouteException e) {
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      e.printStackTrace();
+    }
+  }
   
   @Override
   public Answer processRequest(Request request) {
     int code = request.getCommandCode();
     switch (code) {
     case JMO_DataRequest.code:
-      try {
+    case JReportingInformationRequest.code:
+    case JConnectionManagementRequest.code:
+            try {
         ServerT6aSession serverT6aSession = (ServerT6aSession)this.t6aSessionFactory
             .getNewSession(request.getSessionId(), ServerT6aSession.class, this.getApplicationId(), (Object[])null);
         ((NetworkReqListener)serverT6aSession).processRequest(request);
@@ -92,19 +107,8 @@ public class T6aServer extends T6aAbstractServer {
           .append(request.getCommandCode()).append(" from interface : ").append(request.getApplicationId())
           .append(" from Class ").append(request.getClass().getName()).toString());
       break;
-    case JConnectionManagementRequest.code:
-      // both request and response can be happened
-      logger.error(new StringBuilder("processRequest - : Connection-Manager-Request: Not yet implemented: ")
-          .append(request.getCommandCode()).append(" from interface : ").append(request.getApplicationId())
-          .append(" from Class ").append(request.getClass().getName()).toString());
-      break;
     case JMT_DataAnswer.code:
       logger.error(new StringBuilder("processRequest - : MT-Data-Answer: Not yet implemented: ")
-          .append(request.getCommandCode()).append(" from interface : ").append(request.getApplicationId())
-          .append(" from Class ").append(request.getClass().getName()).toString());
-      break;
-    case JReportingInformationRequest.code:
-      logger.error(new StringBuilder("processRequest - : Reporting-Information-Request: Not yet implemented: ")
           .append(request.getCommandCode()).append(" from interface : ").append(request.getApplicationId())
           .append(" from Class ").append(request.getClass().getName()).toString());
       break;
@@ -128,45 +132,45 @@ public class T6aServer extends T6aAbstractServer {
   public void doSendConfigurationInformationAnswerEvent(ServerT6aSession session,
       JConfigurationInformationRequest request, JConfigurationInformationAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendConfigurationInformationAnswerEvent(session, request, answer);
+    this.scef.handleT6aConfigurationInformationAnswerEvent(session, request, answer);
   }
 
   @Override
   public void doSendConfigurationInformationRequestEvent(ServerT6aSession session,
       JConfigurationInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendConfigurationInformationRequestEvent(session, request);
+    this.scef.handleT6aConfigurationInformationRequestEvent(session, request);
   }
 
   @Override
   public void doSendReportingInformationRequestEvent(ServerT6aSession session, JReportingInformationRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendReportingInformationRequestEvent(session, request);
+    this.scef.handleT6aReportingInformationRequestEvent(session, request);
   }
 
   @Override
   public void doSendMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendMO_DataRequestEvent(session, request);
+    this.scef.handleT6aMO_DataRequestEvent(session, request);
   }
 
   @Override
   public void doSendMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendMT_DataAnswertEvent(session, request, answer);
+    this.scef.handleT6aMT_DataAnswertEvent(session, request, answer);
   }
 
   @Override
   public void doSendConnectionManagementAnswertEvent(ServerT6aSession session, JConnectionManagementRequest request,
       JConnectionManagementAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendConnectionManagementAnswertEvent(session, request, answer);
+    this.scef.handleT6aConnectionManagementAnswertEvent(session, request, answer);
   }
 
   @Override
   public void doSendConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    this.scef.handleSendConnectionManagementRequestEvent(session, request);
+    this.scef.handleT6aConnectionManagementRequestEvent(session, request);
   }
 
 }

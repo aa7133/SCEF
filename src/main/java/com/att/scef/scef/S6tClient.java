@@ -94,7 +94,7 @@ public class S6tClient extends S6tAbstractClient {
           monEvConf.addAvp(Avp.MONITORING_TYPE, m.getMonitoringType(), this.getApplicationId().getVendorId(), true,
               false);
           if (m.getScefRefId() == -1) { // delete
-            for (int i : m.getScefRefIdForDelition()) {
+            for (long i : m.getScefRefIdForDelition()) {
               monEvConf.addAvp(Avp.SCEF_REFERENCE_ID_FOR_DELETION, i, this.getApplicationId().getVendorId(), true,
                   false);
             }

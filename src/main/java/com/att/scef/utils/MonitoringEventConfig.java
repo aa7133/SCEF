@@ -1,11 +1,9 @@
 package com.att.scef.utils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
@@ -18,8 +16,6 @@ import com.att.scef.gson.GMonitoringEventConfig;
 public class MonitoringEventConfig extends GMonitoringEventConfig {
 	
     public static GMonitoringEventConfig[] getChengedMonitoringData(GMonitoringEventConfig[] old, GMonitoringEventConfig[] newData, List<GMonitoringEventConfig> forDelete) {
-      List<GMonitoringEventConfig> l = new ArrayList<GMonitoringEventConfig>();
-      
       Set<Integer> ol = new HashSet<Integer>();
       for (GMonitoringEventConfig g : old) {
         ol.add(g.getMonitoringType());
@@ -45,14 +41,12 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
       tmp.retainAll(ol);
       symmetricDiff.removeAll(tmp);
       
-      
       return null;
     }
     
     
 	public static GMonitoringEventConfig[] getNewHSSData(GHSSUserProfile hssData, List<GMonitoringEventConfig> me, List<GMonitoringEventConfig> deleted) {
-		List<Integer> scefRefIdList = MonitoringEventConfig.getScefRefIdList(me);
-		List<Integer> scefRefidForDelitionList = MonitoringEventConfig.getScefRefIdForDelitionList(deleted);
+		List<Long> scefRefidForDelitionList = MonitoringEventConfig.getScefRefIdForDelitionList(deleted);
 
 		// check and update monitoring event
 		List<GMonitoringEventConfig> lm = new ArrayList<GMonitoringEventConfig>();
@@ -92,8 +86,8 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 		return scefRefIdList;
 	}
 
-	public static List<Integer> getScefRefIdForDelitionList(List<GMonitoringEventConfig> list) {
-		List<Integer> scefRefidForDelitionList = new ArrayList<Integer>();
+	public static List<Long> getScefRefIdForDelitionList(List<GMonitoringEventConfig> list) {
+		List<Long> scefRefidForDelitionList = new ArrayList<Long>();
 		if (list == null) {
 		  return null;
 		}
@@ -102,7 +96,7 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 		  if (d == null) {
 		    continue;
 		  }
-		  for (int i : m.getScefRefIdForDelition()) {
+		  for (long i : m.getScefRefIdForDelition()) {
 		    scefRefidForDelitionList.add(i);
 		  }
 		}
@@ -118,7 +112,7 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 		    continue;
 		  }
 		  scefRefidList.add(m.scefRefId);
-		  s.add(extractFromAvpSingle(a));
+		  s.add(m);
 		}
 		return s;
 	}
@@ -128,7 +122,7 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
         Set<Integer> delition = new HashSet<Integer>();
         try {
 		  monEventConfig.scefId = "";
-          monEventConfig.monitoringType = 0;
+          monEventConfig.monitoringType = -1;
           
 		  for (Avp a: avp.getGrouped()) {
 		    if(a.getCode() == Avp.SCEF_ID) {
@@ -166,7 +160,6 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
             }
 		  }
 		} catch (AvpDataException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		if (delition.size() != 0) {
@@ -176,6 +169,7 @@ public class MonitoringEventConfig extends GMonitoringEventConfig {
 		    d[j++] = i;
 		  }
           monEventConfig.scefRefIdForDelition = d;
+          monEventConfig.scefRefId = 0;
 		}
 
 		return monEventConfig;

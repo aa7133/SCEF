@@ -26,11 +26,14 @@ import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.jdiameter.common.impl.app.t6a.JMO_DataRequestImpl;
+import org.jdiameter.common.impl.app.t6a.JReportingInformationRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.att.scef.gson.GMmeUserProfile;
+import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.interfaces.T6aAbstractClient;
-import com.att.scef.utils.BCDStringConverter;
+import com.att.scef.utils.MonitoringType;
 
 
 public class T6aClient extends T6aAbstractClient {
@@ -52,6 +55,11 @@ public class T6aClient extends T6aAbstractClient {
   public void sendODR(String msisdn, String msg) {
     if (logger.isInfoEnabled()) {
       logger.info("Send ODR to SCEF");
+    }
+    
+    if (msisdn == null || msisdn.length() == 0) {
+      logger.error("No MSISDN");
+      return;
     }
 
     try {
@@ -87,6 +95,69 @@ public class T6aClient extends T6aAbstractClient {
       logger.info("Sent ODR to SCEF");
     }
   }
+  
+  public void sendRIR(String msisdn, GMonitoringEventConfig gmon, int monitoringEvent) {
+    if (logger.isInfoEnabled()) {
+      logger.info("Send RIR from MME to SCEF for device " + msisdn);
+    }
+    try {
+      ClientT6aSession clientT6aSession = this.sessionFactory.getNewAppSession(getApplicationId(), ClientT6aSession.class);
+      
+      JReportingInformationRequest rir = 
+          new JReportingInformationRequestImpl(super.createRequest(clientT6aSession, JReportingInformationRequest.code));
+
+      AvpSet reqSet = rir.getMessage().getAvps();
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
+
+      
+//       * Monitoring-Event-Report::= <AVP header: 3123 10415> TS- 29-128
+      AvpSet monitoringReport = reqSet.addGroupedAvp(Avp.MONITORING_EVENT_REPORT, true, false);
+//      { SCEF-Reference-ID }
+      monitoringReport.addAvp(Avp.SCEF_REFERENCE_ID, gmon.getScefRefId());
+//      [ SCEF-ID ]
+      monitoringReport.addAvp(Avp.SCEF_ID, gmon.getScefId(), this.getApplicationId().getVendorId(), true, false, false);
+//      [ Monitoring-Type ]
+      monitoringReport.addAvp(Avp.MONITORING_TYPE, monitoringEvent);
+//      [ Reachability-Information ]
+      if (monitoringEvent == MonitoringType.UE_REACHABILITY) {
+        monitoringReport.addAvp(Avp.REACHABILITY_INFORMATION, MonitoringType.UE_REACHABILITY_REACHABLE_FOR_DATA);
+      }
+//      [ EPS-Location-Information ]
+      else if (monitoringEvent == MonitoringType.LOCATION_REPORTING) {
+        AvpSet epsLocation = reqSet.addGroupedAvp(Avp.EPS_LOCATION_INFORMATION, false, false);
+        AvpSet mmeLocation = epsLocation.addGroupedAvp(Avp.MME_LOCATION_INFORMATION, false, false);
+        mmeLocation.addAvp(Avp.TRACKING_AREA_IDENTITY, "JUSTDemo123", this.getApplicationId().getVendorId(), false, false, true);
+      }
+//      [ Communication-Failure-Information ]
+      else if (monitoringEvent == MonitoringType.COMMUNICATION_FAILURE) {
+        AvpSet commFailure = reqSet.addGroupedAvp(Avp.COMMUNICATION_FAILURE_INFORMATION, this.getApplicationId().getVendorId(), true, false);
+        commFailure.addAvp(Avp.CAUSE_TYPE, MonitoringType.CAUSE_TYPE_NAS);
+        commFailure.addAvp(Avp.S1AP_CAUSE, MonitoringType.CAUSE_TYPE_NAS);
+      }
+//      *[ Number-Of-UE-Per-Location-Report ]
+      else if (monitoringEvent == MonitoringType.NUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA) {
+        AvpSet uePerLocation = reqSet.addGroupedAvp(Avp.NUMBER_OF_UE_PER_LOCATION_REPORT, this.getApplicationId().getVendorId(), true, false);
+        AvpSet epsLocation = uePerLocation.addGroupedAvp(Avp.EPS_LOCATION_INFORMATION, true, false);
+        AvpSet mmeLocation = epsLocation.addGroupedAvp(Avp.MME_LOCATION_INFORMATION, true, false);
+        mmeLocation.addAvp(Avp.TRACKING_AREA_IDENTITY, "JUSTDemo123", this.getApplicationId().getVendorId(), false, false, true);
+        
+        uePerLocation.addAvp(Avp.UE_COUNT, 2000, true, false);
+      }
+
+      clientT6aSession.sendReportingInformationRequest(rir);
+
+    } catch (InternalException e) {
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      e.printStackTrace();
+    } catch (RouteException e) {
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      e.printStackTrace();
+    }
+    
+  }
+
 
   @Override
   public Answer processRequest(Request request) {

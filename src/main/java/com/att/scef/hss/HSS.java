@@ -224,7 +224,7 @@ public class HSS {
 	public void handleConfigurationInformationRequestEvent(ServerS6tSession session, JConfigurationInformationRequest cir)
 			throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 		if (logger.isInfoEnabled()) {
-			logger.info("Got Configuration Information Request (CIR)");
+			logger.info("Got Configuration Information Request (CIR) from SCEF");
 		}
 		AvpSet reqSet = cir.getMessage().getAvps();
 
@@ -262,8 +262,6 @@ public class HSS {
 						.append(" external ID  : ").append(uid.getExternalId() != null ? uid.getExternalId() : "NULL").toString());
 				imsi = setImsiFromUid(null, uid);
 				newUser = true;
-				//s6tServer.sendCIAAnswer(session, cir, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
-				//return;
 			}
 
 			Avp AESECommPatternAvp = reqSet.getAvp(Avp.AESE_COMMUNICATION_PATTERN);
@@ -277,14 +275,16 @@ public class HSS {
 				monitoringEvent = MonitoringEventConfig.extractFromAvp(monitoringEventConfig);
 	            List<GMonitoringEventConfig> mcCopy = new ArrayList<GMonitoringEventConfig>();
 	            for (GMonitoringEventConfig g : monitoringEvent) {
+	              if (logger.isInfoEnabled()) {
+	                logger.info("SCEF ref id = " + g.getScefRefId());
+	              }
 	              mcCopy.add(g);
 	            }
 				for (GMonitoringEventConfig m : mcCopy) {
-				  logger.info("Monitoring Type = " + m.getMonitoringType());
 				  if (m.getScefRefIdForDelition() != null) {
 				    forDelete.add(m);
 				    monitoringEvent.remove(m);
-				    for (int i : m.getScefRefIdForDelition()) {
+				    for (long i : m.getScefRefIdForDelition()) {
 				      logger.info("for delete = " + i);
 				    }
 				  }
@@ -299,6 +299,9 @@ public class HSS {
 			  hssData.setMonitoringConfig((GMonitoringEventConfig[])monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]));
 			  hssData.setAESECommunicationPattern((GAESE_CommunicationPattern[])aeseComPattern.toArray(new GAESE_CommunicationPattern[aeseComPattern.size()]));
 			  String value = new Gson().toJson(hssData);
+			  hssData.setIMEI(imsi);
+			  hssData.setIMSI(imsi);
+			  hssData.setMsisdn(imsi);
 			  String key = "HSS-IMSI-" + imsi;
 			  logger.info("Write to redis Key = " + key + ", Value = " + value);
 			  this.getSyncHandler().set(key, value);
@@ -323,16 +326,6 @@ public class HSS {
                   }
                 }
 
-/**	            
-	            GMonitoringEventConfig[] changedMonirtoring =  MonitoringEventConfig.getChengedMonitoringData(
-	                oldMonitoring, monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]),forDelete);
-	            
-	            if (logger.isInfoEnabled()) {
-	              for (GMonitoringEventConfig g : changedMonirtoring) {
-	                logger.info("Changed monitoring types = " + g.getMonitoringType());
-	              }
-	            }
-*/
 	            hssData.setMonitoringConfig(MonitoringEventConfig.getNewHSSData(hssData, monitoringEvent, forDelete));
 
 	            //update new data to hss
@@ -341,16 +334,12 @@ public class HSS {
 	            hssData.setMMEAdress(this.s6aServer.getRemoteRealm());
 	 		}
 	        
-            for (GMonitoringEventConfig m : hssData.getMonitoringConfig()) {
-              logger.info("hss data - Monitoring Type = " + m.getMonitoringType());
-            }
-			
     		GsonBuilder builder = new GsonBuilder();
             // we ignore Private fields
             builder.excludeFieldsWithModifiers(Modifier.PRIVATE);
-            Gson gson = builder.create();
+            //Gson gson = builder.create();
     		
-    		RedisFuture<String> setHss = this.getAsyncHandler().set("HSS-MSISDN-" + uid.msisdn,gson.toJson(hssData));
+    		RedisFuture<String> setHss = this.getAsyncHandler().set("HSS-MSISDN-" + uid.msisdn,builder.create().toJson(hssData));
 
     		// send answer to SCEF
     		s6tServer.sendCIAAnswer(session, cir, ResultCode.SUCCESS);
