@@ -93,7 +93,8 @@ public class MME {
     String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
     String t6aConfigFile = DEFAULT_T6A_CONFIG_FILE;
     String dictionaryFile = DEFAULT_DICTIONARY_FILE;
-    String host = "127.0.0.1";
+    //String host = "127.0.0.1";
+    String host = "ILTLV937";
     int port = 6379;
     String channel = "MME-Clients";
     
@@ -452,7 +453,7 @@ public class MME {
       userProfile.setMonitoringEvents(monitoringConfigArray);
       String buf = new Gson().toJson(userProfile);
       future = this.asyncHandler.set(DEFAULT_PROFILE_PREFIX + msisdn, buf /*new Gson().toJson(userProfile)*/);
-      logger.info("saving user :" + DEFAULT_PROFILE_PREFIX + msisdn + "--" + buf);
+      logger.info("saving user : " + DEFAULT_PROFILE_PREFIX + msisdn + " -- " + buf);
       
       if (logger.isInfoEnabled()) {
         logger.info(sb.toString());
@@ -523,8 +524,12 @@ public class MME {
   public void handleReportingInformationAnswerEvent(ClientT6aSession session, JReportingInformationRequest request,
       JReportingInformationAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("Received \"T6a RIA\" event, request[" + request + "], answer[" + answer + "], on session["
-        + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got Reporting-Information-Answer (RIA)");
+    }
+    AvpSet reqSet = request.getMessage().getAvps();
+    AvpSet ansSet = answer.getMessage().getAvps();
+    
   }
 
   public void handleMO_DataAnswerEvent(ClientT6aSession session, JMO_DataRequest request, JMO_DataAnswer answer)
@@ -539,7 +544,39 @@ public class MME {
 
   public void handleMT_DataRequestEvent(ClientT6aSession session, JMT_DataRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("Received \"T6a TDR\" event, request[" + request + "], on session[" + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got MO-Data-Answer (ODR)");
+    }
+    try {
+      AvpSet reqSet = request.getMessage().getAvps();
+
+      Avp userIdentifier = reqSet.getAvp(Avp.USER_IDENTIFIER);
+      if (userIdentifier == null) {
+        if (logger.isInfoEnabled()) {
+          logger.info("MO-Data-Request (ODR) missing the mandatory \"User-Identifier\" parameter");
+        }
+        this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+
+      Avp bearer = reqSet.getAvp(Avp.BEARER_IDENTIFIER);
+      if (bearer == null) {
+        if (logger.isInfoEnabled()) {
+          logger.info("MO-Data-Request (ODR) missing the mandatory \"Bearer-Identifier\" parameter");
+        }
+        this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_INVALID_EPS_BEARER);
+        return;
+      }
+      this.t6aClient.sendTDA(session, request, ResultCode.SUCCESS);
+
+      Avp niddData = reqSet.getAvp(Avp.NON_IP_DATA);
+      String msg = niddData.getUTF8String();
+      logger.info("got message : \"" + msg + "\"");
+      
+    } catch (AvpDataException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
   }
 
   public void handleConnectionManagementAnswerEvent(ClientT6aSession session, JConnectionManagementRequest request,

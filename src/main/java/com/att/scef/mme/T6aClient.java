@@ -22,10 +22,12 @@ import org.jdiameter.api.t6a.events.JConnectionManagementAnswer;
 import org.jdiameter.api.t6a.events.JConnectionManagementRequest;
 import org.jdiameter.api.t6a.events.JMO_DataAnswer;
 import org.jdiameter.api.t6a.events.JMO_DataRequest;
+import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.jdiameter.common.impl.app.t6a.JMO_DataRequestImpl;
+import org.jdiameter.common.impl.app.t6a.JMT_DataAnswerImpl;
 import org.jdiameter.common.impl.app.t6a.JReportingInformationRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,31 @@ public class T6aClient extends T6aAbstractClient {
   
   public void init(String clientID) throws Exception {
       this.init(new FileInputStream(configFile), clientID);
+  }
+  
+  public void sendTDA(ClientT6aSession session, JMT_DataRequest request, int resultCode) {
+    if (logger.isInfoEnabled()) {
+      logger.info("Sent TDA to SCEF");
+    }
+    try {
+      JMT_DataAnswer tda = new JMT_DataAnswerImpl((Request)request.getMessage(), resultCode);
+      Answer answer = (Answer)tda.getMessage();
+      AvpSet set = answer.getAvps();
+      session.sendMTDataAnswer(this.t6aSessionFactory.createMT_DataAnswer(answer));
+    } catch (InternalException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (RouteException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+
   }
   
   public void sendODR(String msisdn, String msg) {

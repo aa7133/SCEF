@@ -105,7 +105,8 @@ public class HSS {
 	    	String s6tConfigFile = DEFAULT_S6T_CONFIG_FILE;
 	    	String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
 	    	String dictionaryFile = DEFAULT_DICTIONARY_FILE;
-	    	String host = "127.0.0.1";
+	        String host = "ILTLV937";
+	    	//String host = "127.0.0.1";
 	    	int port = 6379;
 	    	String channel = "";
 	    	
@@ -188,10 +189,10 @@ public class HSS {
 	private String getImsiFromUid(GUserIdentifier uid) {
 		String imsi = null;
 		if (uid.getMsisdn() != null && uid.getMsisdn().length() > 0) {
-			imsi = this.getSyncHandler().get("HSS-MSISDN" + uid.getMsisdn());
+			imsi = this.getSyncHandler().get("HSS-MSISDN-" + uid.getMsisdn());
 		}
 		else if (uid.getUserName() != null && uid.getUserName().length() > 0) {
-			imsi = this.getSyncHandler().get("HSS-USER-NAME" + uid.getUserName());
+			imsi = this.getSyncHandler().get("HSS-USER-NAME-" + uid.getUserName());
 		}
 		else if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
 			imsi = this.getSyncHandler().get("HSS-EXT-ID-" + uid.getExternalId());
@@ -210,10 +211,10 @@ public class HSS {
         imsi = msisdn;
       }
       if (msisdn != null && msisdn.length() != 0) {
-        this.getSyncHandler().set("HSS-MSISDN" + msisdn, imsi);
+        this.getSyncHandler().set("HSS-MSISDN-" + msisdn, imsi);
       }
       if (uid.getUserName() != null && uid.getUserName().length() > 0) {
-        this.getSyncHandler().set("HSS-USER-NAME" + uid.getUserName(), imsi);
+        this.getSyncHandler().set("HSS-USER-NAME-" + uid.getUserName(), imsi);
       }
       if (uid.getExternalId() != null && uid.getExternalId().length() > 0) {
         this.getSyncHandler().set("HSS-EXT-ID-" + uid.getExternalId(), imsi);
@@ -298,10 +299,10 @@ public class HSS {
 	          hssData = new GHSSUserProfile();
 			  hssData.setMonitoringConfig((GMonitoringEventConfig[])monitoringEvent.toArray(new GMonitoringEventConfig[monitoringEvent.size()]));
 			  hssData.setAESECommunicationPattern((GAESE_CommunicationPattern[])aeseComPattern.toArray(new GAESE_CommunicationPattern[aeseComPattern.size()]));
-			  String value = new Gson().toJson(hssData);
 			  hssData.setIMEI(imsi);
 			  hssData.setIMSI(imsi);
 			  hssData.setMsisdn(imsi);
+              String value = new Gson().toJson(hssData);
 			  String key = "HSS-IMSI-" + imsi;
 			  logger.info("Write to redis Key = " + key + ", Value = " + value);
 			  this.getSyncHandler().set(key, value);

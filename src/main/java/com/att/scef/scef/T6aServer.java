@@ -3,6 +3,9 @@ package com.att.scef.scef;
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
+import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpDataException;
+import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.NetworkReqListener;
@@ -12,6 +15,7 @@ import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
+import org.jdiameter.api.t6a.ClientT6aSession;
 import org.jdiameter.api.t6a.ServerT6aSession;
 import org.jdiameter.api.t6a.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.t6a.events.JConfigurationInformationRequest;
@@ -24,10 +28,12 @@ import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
 import org.jdiameter.common.impl.app.t6a.JMO_DataAnswerImpl;
+import org.jdiameter.common.impl.app.t6a.JMT_DataRequestImpl;
 import org.jdiameter.common.impl.app.t6a.JReportingInformationAnswerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.interfaces.T6aAbstractServer;
 
 public class T6aServer extends T6aAbstractServer {
@@ -84,6 +90,39 @@ public class T6aServer extends T6aAbstractServer {
     } catch (OverloadException e) {
       e.printStackTrace();
     }
+  }
+  
+  public String sendTDRRequest(GSCEFUserProfile userProfile, String message) {
+    try {
+          ServerT6aSession serverT6aSession = this.sessionFactory.getNewAppSession(getApplicationId(),
+              ServerT6aSession.class);
+          JMT_DataRequest tdr = new JMT_DataRequestImpl(super.createRequest(serverT6aSession, JMT_DataRequest.code, 
+              userProfile.getMsisdn(), "Bearer-fake"));
+          AvpSet reqSet = tdr.getMessage().getAvps();
+          Avp sessionIdAvp = reqSet.getAvp(Avp.SESSION_ID);
+          String sessionId = sessionIdAvp.getUTF8String();
+          
+          reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
+          
+          reqSet.addAvp(Avp.NON_IP_DATA, message, false);
+
+
+          serverT6aSession.sendMT_DataRequest(tdr);
+          
+          return sessionId;
+
+    } catch (InternalException e) {
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      e.printStackTrace();
+    } catch (RouteException e) {
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      e.printStackTrace();
+    } catch (AvpDataException e) {
+      e.printStackTrace();
+    }
+    return null;
   }
   
   @Override
