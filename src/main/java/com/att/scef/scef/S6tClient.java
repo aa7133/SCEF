@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
 import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.Configuration;
 import org.jdiameter.api.IllegalDiameterStateException;
@@ -52,7 +53,8 @@ public class S6tClient extends S6tAbstractClient {
 	}
 
 
-  public void sendCirRequest(GSCEFUserProfile newMsg, GMonitoringEventConfig[] mc, GAESE_CommunicationPattern[] cp) {
+  public String sendCirRequest(GSCEFUserProfile newMsg, GMonitoringEventConfig[] mc, GAESE_CommunicationPattern[] cp) {
+    String sessionID = null;
     try {
       Configuration conf = this.getStack().getMetaData().getConfiguration();
       ClientS6tSession session = (ClientS6tSession) this.sessionFactory.getNewAppSession(
@@ -67,6 +69,8 @@ public class S6tClient extends S6tAbstractClient {
       Request request = this.createRequest(session, JConfigurationInformationRequest.code);
 
       AvpSet reqSet = request.getAvps();
+      Avp sessionIdAvp = reqSet.getAvp(Avp.SESSION_ID);
+      sessionID = sessionIdAvp.getUTF8String();
 
       reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
 
@@ -117,6 +121,8 @@ public class S6tClient extends S6tAbstractClient {
       if (logger.isInfoEnabled()) {
         logger.info("Configuration-Information-Request sent to HSS");
       }
+      return sessionID;
+      
     } catch (IllegalDiameterStateException e) {
       e.printStackTrace();
     } catch (InternalException e) {
@@ -125,7 +131,10 @@ public class S6tClient extends S6tAbstractClient {
       e.printStackTrace();
     } catch (OverloadException e) {
       e.printStackTrace();
+    } catch (AvpDataException e) {
+      e.printStackTrace();
     }
+    return sessionID;
   }
 
   public void sendNirRequest(GSCEFUserProfile profile) {

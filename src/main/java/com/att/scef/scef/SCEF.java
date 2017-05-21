@@ -246,33 +246,37 @@ public class SCEF {
   public void sendDiamterMessages(String msg) {
      String[] headers = msg.split("\\|");
      String cmd = headers[0].toLowerCase();
+     String sessionId = null;
+     SetArgs args = new SetArgs();
+     args.ex(15);
+
      if (cmd.equals("add")) {
-       this.sendCirRiRMessages(headers);
+       sessionId = this.sendCirRiRMessages(headers);
      }
      else if (cmd.equals("cmd")) {
-       String sessionId = this.sendTDRRequest(headers);
-       if (sessionId != null) {
-         //set the session id to Redis with the message as value
-         SetArgs args = new SetArgs();
-         args.ex(15);
-         this.getAsyncHandler().set(sessionId, msg, args);
-       }
+       sessionId = this.sendTDRRequest(headers);
      }
      else {
        logger.error("UnSupported command!!");
+     }
+
+     if (sessionId != null) {
+       //set the session id to Redis with the message as value
+       this.getAsyncHandler().set(sessionId, msg, args);
      }
   }
 	/**
 	 * 
 	 * @param msg
 	 */
-	public void sendCirRiRMessages(String[] msg) {
+	public String sendCirRiRMessages(String[] msg) {
 	    logger.info("sendDiamterMessages");
 		GSCEFUserProfile newMsg = getFormatedMessage(msg);
 		RedisFuture<String> setScefExternId = null;
         RedisFuture<String> setScefMsisdn = null;
         RedisFuture<String> setScefUserName = null;
         List<RedisFuture<String>> setScefRefId = new ArrayList<RedisFuture<String>>();
+        String session = null;
 		
 		Runnable listener = new Runnable() {
 		    @Override
@@ -312,7 +316,7 @@ public class SCEF {
 			// send command to HSS
 			if (mc.length != 0) {
 	            logger.info("Sending Configuration Information Request (CIR)");
-				this.s6tClient.sendCirRequest(newMsg, mc, null);
+				session = this.s6tClient.sendCirRequest(newMsg, mc, null);
 			}
 			if (newMsg.getDataQueueAddress() != null) {
 				// send NIR
@@ -375,7 +379,7 @@ public class SCEF {
 			// we need to send CIR here
 			if (mc.length != 0) {
 			    logger.info("Sending Configuration Information Request (CIR)");
-				this.s6tClient.sendCirRequest(newMsg, mc, null);
+			    session = this.s6tClient.sendCirRequest(newMsg, mc, null);
 			}
 			
             logger.info("Sending NIDD-Information-Request (NIR)");
@@ -435,6 +439,7 @@ public class SCEF {
             f.thenRun(listener);
           }
         }
+        return session;
 	}
 	
 	
@@ -574,22 +579,29 @@ public class SCEF {
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
 
     StringBuffer str = new StringBuffer("");
-    boolean session_id = false;
+    boolean sessionIdFlag = false;
     boolean auth_sessin_state = false;
     boolean orig_host = false;
     boolean orig_relm = false;
+    String sessionID = null;
+    GUserIdentifier uid = null;
+    GSCEFUserProfile userProfile = null;
+    int resultCode = -1;
+    
     try {
       for (Avp a : answer.getMessage().getAvps()) {
         switch (a.getCode()) {
         case Avp.SESSION_ID:
-          session_id = true;
-          str.append("SESSION_ID : ").append(a.getUTF8String()).append("\n");
+          sessionIdFlag = true;
+          sessionID = a.getUTF8String();
+          str.append("SESSION_ID : ").append(sessionID).append("\n");
           break;
         case Avp.DRMP:
           str.append("\tDRMP : ").append(a.getUTF8String()).append("\n");
           break;
         case Avp.RESULT_CODE:
-          str.append("\tRESULT_CODE : ").append(a.getInteger32()).append("\n");
+          resultCode = a.getInteger32();
+          str.append("\tRESULT_CODE : ").append(resultCode).append("\n");
           break;
         case Avp.EXPERIMENTAL_RESULT:
           str.append("\tEXPERIMENTAL_RESULT : ").append(a.getInteger32()).append("\n");
@@ -597,7 +609,6 @@ public class SCEF {
         case Avp.AUTH_SESSION_STATE:
           auth_sessin_state = true;
           break;
-
         case Avp.ORIGIN_HOST:
           orig_host = true;
           break;
@@ -611,6 +622,13 @@ public class SCEF {
         case Avp.SUPPORTED_FEATURES: // grouped
           break;
         case Avp.USER_IDENTIFIER:
+          uid = UserIdentifier.extractFromAvpSingle(a);
+          String data = this.getSyncHandler().get(SCEF_MSISDN_PREFIX + uid.getMsisdn());
+          if (data == null || data.length() == 0) {
+            logger.error("No data on user : " +  uid.getMsisdn());
+            return;
+          }
+          userProfile = new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
           break;
         case Avp.MONITORING_EVENT_REPORT: // grouped
           break;
@@ -633,10 +651,24 @@ public class SCEF {
         }
 
       }
+      
+      String message =this.getSyncHandler().get(sessionID);
+
+      if (resultCode == ResultCode.SUCCESS) {
+        this.handler.publish(userProfile.getMonitoroingQueue(),
+            new StringBuffer("3|").append(userProfile.getExternalId())
+                .append("|").append(message).toString());
+      }
+      else {
+        this.handler.publish(userProfile.getMonitoroingQueue(),
+            new StringBuffer("2|").append(userProfile.getExternalId())
+                .append("|").append(message).toString());
+      }
+
     } catch (AvpDataException e) {
       e.printStackTrace();
     }
-    if (!session_id || !auth_sessin_state || !orig_host || !orig_relm) {
+    if (!sessionIdFlag || !auth_sessin_state || !orig_host || !orig_relm) {
       logger.error("Configuration-Information-Answer (CIA) - mandatory paramters are missing");
     }
     logger.info(str.toString());
@@ -909,7 +941,6 @@ public class SCEF {
       GSCEFUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
 
       Avp result = ansSet.getAvp(Avp.RESULT_CODE);
-
       if (result != null && result.getUnsigned32() == ResultCode.SUCCESS) {
         this.handler.publish(userProfile.getMonitoroingQueue(),
             new StringBuffer("3|").append(userProfile.getExternalId())
