@@ -93,8 +93,8 @@ public class MME {
     String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
     String t6aConfigFile = DEFAULT_T6A_CONFIG_FILE;
     String dictionaryFile = DEFAULT_DICTIONARY_FILE;
-    //String host = "127.0.0.1";
-    String host = "ILTLV937";
+    String host = "127.0.0.1";
+    //String host = "ILTLV937";
     int port = 6379;
     String channel = "MME-Clients";
     

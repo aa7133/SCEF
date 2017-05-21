@@ -41,7 +41,6 @@ import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.gson.GUserIdentifier;
-import com.att.scef.mme.MmePubSubListener;
 import com.att.scef.utils.MonitoringType;
 import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
@@ -95,8 +94,8 @@ public class SCEF {
     	String s6tCconfigFile = DEFAULT_S6T_CONFIG_FILE;
     	String t6aCconfigFile = DEFAULT_T6A_CONFIG_FILE;
     	String dictionaryFile = DEFAULT_DICTIONARY_FILE;
-    	String host = "ILTLV937";
-    	//String host = "127.0.0.1";
+    	//String host = "ILTLV937";
+    	String host = "127.0.0.1";
     	int port = 6379;
     	String channel = "DeviceFromApp";
     	
@@ -577,6 +576,9 @@ public class SCEF {
   public void handleConfigurationInformationAnswerEvent(ClientS6tSession session,
       JConfigurationInformationRequest request, JConfigurationInformationAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
+    if (logger.isInfoEnabled()) {
+      logger.info("Recieved CIA");
+    }
 
     StringBuffer str = new StringBuffer("");
     boolean sessionIdFlag = false;
@@ -651,19 +653,25 @@ public class SCEF {
         }
 
       }
+      if (logger.isInfoEnabled()) {
+        logger.info(str.toString());
+      }
       
       String message =this.getSyncHandler().get(sessionID);
-
+      String msg;
+      String externalId = userProfile.getExternalId();
       if (resultCode == ResultCode.SUCCESS) {
-        this.handler.publish(userProfile.getMonitoroingQueue(),
-            new StringBuffer("3|").append(userProfile.getExternalId())
-                .append("|").append(message).toString());
+        msg = new StringBuffer("3|").append(userProfile.getExternalId())
+            .append("|").append(message).toString();
       }
       else {
-        this.handler.publish(userProfile.getMonitoroingQueue(),
-            new StringBuffer("2|").append(userProfile.getExternalId())
-                .append("|").append(message).toString());
+        msg = new StringBuffer("2|").append(userProfile.getExternalId())
+            .append("|").append(message).toString(); 
       }
+      if (logger.isInfoEnabled()) {
+        logger.info("msg to SCS is : " + msg);
+      }
+      this.handler.publish(userProfile.getMonitoroingQueue(), msg);
 
     } catch (AvpDataException e) {
       e.printStackTrace();

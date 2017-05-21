@@ -105,8 +105,8 @@ public class HSS {
 	    	String s6tConfigFile = DEFAULT_S6T_CONFIG_FILE;
 	    	String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
 	    	String dictionaryFile = DEFAULT_DICTIONARY_FILE;
-	        String host = "ILTLV937";
-	    	//String host = "127.0.0.1";
+	        //String host = "ILTLV937";
+	    	String host = "127.0.0.1";
 	    	int port = 6379;
 	    	String channel = "";
 	    	
@@ -332,8 +332,8 @@ public class HSS {
 	            //update new data to hss
 	            hssData.setAESECommunicationPattern(AESE_CommunicationPattern.getNewHSSData(hssData, aeseComPattern));
 	            logger.info("Setting the MME address to : " + this.s6aServer.getRemoteRealm());
-	            hssData.setMMEAdress(this.s6aServer.getRemoteRealm());
 	 		}
+            hssData.setMMEAdress(this.s6aServer.getRemoteRealm());
 	        
     		GsonBuilder builder = new GsonBuilder();
             // we ignore Private fields

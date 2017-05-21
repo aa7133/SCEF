@@ -94,6 +94,11 @@ public class S6tServer extends S6tAbstractServer {
       updateAnswer(cir.getMessage(), answer, resultCode);
       
       AvpSet set = answer.getAvps();
+      AvpSet reqSet = cir.getMessage().getAvps();
+      Avp uid = reqSet.getAvp(Avp.USER_IDENTIFIER);
+      if (uid != null) {
+        set.addAvp(uid);
+      }
       
       //TODO
       //Utils.printMessage(logger, this.getStack().getDictionary(), answer, true);
