@@ -80,9 +80,9 @@ public class SCEF {
 	private final static String DEFAULT_T6A_SERVER_NAME = "T6A-SERVER";
 	
 	private final static String DEFAULT_SCEF_ID = "aaa://127.0.0.1:2300";
-    private final static String DEFAULT_S6T_CONFIG_FILE = "/home/odldev/scef/src/main/resources/scef/config-scef-s6t.xml";
-    private final static String DEFAULT_T6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/scef/config-scef-t6a.xml";
-    private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
+    private final static String DEFAULT_S6T_CONFIG_FILE = "src/main/resources/scef/config-scef-s6t.xml";
+    private final static String DEFAULT_T6A_CONFIG_FILE = "src/main/resources/scef/config-scef-t6a.xml";
+    private final static String DEFAULT_DICTIONARY_FILE = "src/main/resources/dictionary.xml";
 
     private S6tClient s6tClient;
     private T6aServer t6aServer;

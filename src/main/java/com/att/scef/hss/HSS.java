@@ -78,9 +78,9 @@ public class HSS {
 	private final static String DEFAULT_S6A_SERVER_NAME = "S6a-Server";
 
  
-	private final static String DEFAULT_S6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/hss/config-hss-s6a.xml";
-    private final static String DEFAULT_S6T_CONFIG_FILE = "/home/odldev/scef/src/main/resources/hss/config-hss-s6t.xml";
-    private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
+	private final static String DEFAULT_S6A_CONFIG_FILE = "src/main/resources/hss/config-hss-s6a.xml";
+    private final static String DEFAULT_S6T_CONFIG_FILE = "src/main/resources/hss/config-hss-s6t.xml";
+    private final static String DEFAULT_DICTIONARY_FILE = "src/main/resources/dictionary.xml";
 
 
 	   public static void main(String[] args) {

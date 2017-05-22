@@ -81,9 +81,9 @@ public class MME {
   private final static String DEFAULT_T6A_CLIENT_NAME = "T6a-CLIENT";
 
 
-  private final static String DEFAULT_S6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/mme/config-mme-s6a.xml";
-  private final static String DEFAULT_T6A_CONFIG_FILE = "/home/odldev/scef/src/main/resources/mme/config-mme-t6a.xml";
-  private final static String DEFAULT_DICTIONARY_FILE = "/home/odldev/scef/src/main/resources/dictionary.xml";
+  private final static String DEFAULT_S6A_CONFIG_FILE = "src/main/resources/mme/config-mme-s6a.xml";
+  private final static String DEFAULT_T6A_CONFIG_FILE = "src/main/resources/mme/config-mme-t6a.xml";
+  private final static String DEFAULT_DICTIONARY_FILE = "src/main/resources/dictionary.xml";
 
   private final static String DEFAULT_PROFILE_PREFIX = "MME-USER-";
   private final static int ACTIVE = 1;
