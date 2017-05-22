@@ -9,7 +9,6 @@ import org.jdiameter.api.AvpSet;
 
 import com.att.scef.gson.GAESE_CommunicationPattern;
 import com.att.scef.gson.GHSSUserProfile;
-import com.att.scef.gson.GMonitoringEventConfig;
 
 public class AESE_CommunicationPattern extends GAESE_CommunicationPattern {
 	

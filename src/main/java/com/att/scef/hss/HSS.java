@@ -3,31 +3,22 @@ package com.att.scef.hss;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 
-import org.jdiameter.api.Answer;
-import org.jdiameter.api.ApplicationId;
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
-import org.jdiameter.api.Mode;
-import org.jdiameter.api.Network;
 import org.jdiameter.api.OverloadException;
-import org.jdiameter.api.Request;
 import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
-import org.jdiameter.api.app.StateChangeListener;
 import org.jdiameter.api.s6a.ServerS6aSession;
-import org.jdiameter.api.s6a.ServerS6aSessionListener;
 import org.jdiameter.api.s6a.events.JAuthenticationInformationRequest;
 import org.jdiameter.api.s6a.events.JCancelLocationAnswer;
 import org.jdiameter.api.s6a.events.JCancelLocationRequest;
@@ -41,30 +32,21 @@ import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
 import org.jdiameter.api.s6t.ServerS6tSession;
-import org.jdiameter.api.s6t.ServerS6tSessionListener;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
 import org.jdiameter.api.s6t.events.JNIDDInformationRequest;
 import org.jdiameter.api.s6t.events.JReportingInformationAnswer;
 import org.jdiameter.api.s6t.events.JReportingInformationRequest;
-import org.jdiameter.client.api.ISessionFactory;
-import org.jdiameter.common.impl.app.s6a.S6aSessionFactoryImpl;
-import org.jdiameter.common.impl.app.s6t.S6tSessionFactoryImpl;
-import org.jdiameter.server.impl.app.s6a.S6aServerSessionImpl;
-import org.jdiameter.server.impl.app.s6t.S6tServerSessionImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.jdiameter.client.impl.helpers.Parameters.OwnDiameterURI;
 
 import com.att.scef.data.AsyncDataConnector;
 import com.att.scef.data.ConnectorImpl;
 import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GAESE_CommunicationPattern;
-import com.att.scef.gson.GCommunicationPatternSet;
 import com.att.scef.gson.GHSSUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GUserIdentifier;
-import com.att.scef.interfaces.AbstractServer;
 import com.att.scef.utils.AESE_CommunicationPattern;
 import com.att.scef.utils.MonitoringEventConfig;
 import com.att.scef.utils.UserIdentifier;
@@ -140,6 +122,9 @@ public class HSS {
 	@SuppressWarnings("unchecked")
 	public HSS(String s6tConfigFile, String s6aConfigFile, String dictionaryFile, String host, int port, String channel) {
 		super();
+	      logger.info("config file S6t = " + s6tConfigFile + "  config file S6a = " + s6aConfigFile 
+              + " Dictionery file = " + dictionaryFile 
+              + " redis host = " + host + " redis port = " + port);
 		asyncDataConnector = new ConnectorImpl();
 		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 

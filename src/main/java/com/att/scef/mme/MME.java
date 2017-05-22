@@ -127,6 +127,10 @@ public class MME {
   @SuppressWarnings("unchecked")
   public MME(String s6aConfigFile, String t6aConfigFile, String dictionaryFile, String host, int port, String channel) {
       super();
+      logger.info("config file S6a = " + s6aConfigFile + "  config file T6a = " + t6aConfigFile 
+                + " Dictionery file = " + dictionaryFile 
+                + " redis host = " + host + " redis port = " + port);
+      
       asyncDataConnector = new ConnectorImpl();
       asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 

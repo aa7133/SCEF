@@ -3,8 +3,6 @@ package com.att.scef.mme;
 import java.io.FileInputStream;
 
 import org.jdiameter.api.Answer;
-import org.jdiameter.api.Avp;
-import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
 import org.jdiameter.api.NetworkReqListener;
@@ -31,15 +29,11 @@ import org.jdiameter.api.s6a.events.JResetAnswer;
 import org.jdiameter.api.s6a.events.JResetRequest;
 import org.jdiameter.api.s6a.events.JUpdateLocationAnswer;
 import org.jdiameter.api.s6a.events.JUpdateLocationRequest;
-import org.jdiameter.api.t6a.ClientT6aSession;
-import org.jdiameter.api.t6a.events.JMO_DataRequest;
 import org.jdiameter.common.impl.app.s6a.JInsertSubscriberDataAnswerImpl;
-import org.jdiameter.common.impl.app.t6a.JMO_DataRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.att.scef.interfaces.S6aAbstractClient;
-import com.att.scef.scef.SCEF;
 
 public class S6aClient extends S6aAbstractClient {
   protected final Logger logger = LoggerFactory.getLogger(S6aClient.class);
@@ -68,7 +62,7 @@ public class S6aClient extends S6aAbstractClient {
       JInsertSubscriberDataAnswer ida = new JInsertSubscriberDataAnswerImpl((Request)idr.getMessage(), resultCode);
       Answer answer = (Answer)ida.getMessage();
       
-      AvpSet set = answer.getAvps();
+      //AvpSet set = answer.getAvps();
       
       session.sendInsertSubscriberDataAnswer(this.s6aSessionFactory.createInsertSubscriberDataAnswer(answer));
     } catch (InternalException e) {

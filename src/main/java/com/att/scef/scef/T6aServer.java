@@ -15,7 +15,6 @@ import org.jdiameter.api.RouteException;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
-import org.jdiameter.api.t6a.ClientT6aSession;
 import org.jdiameter.api.t6a.ServerT6aSession;
 import org.jdiameter.api.t6a.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.t6a.events.JConfigurationInformationRequest;

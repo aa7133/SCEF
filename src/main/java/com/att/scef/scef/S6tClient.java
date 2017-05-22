@@ -19,7 +19,6 @@ import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
 import org.jdiameter.api.s6t.ClientS6tSession;
-import org.jdiameter.api.s6t.ServerS6tSession;
 import org.jdiameter.api.s6t.events.JConfigurationInformationAnswer;
 import org.jdiameter.api.s6t.events.JConfigurationInformationRequest;
 import org.jdiameter.api.s6t.events.JNIDDInformationAnswer;
@@ -49,6 +48,9 @@ public class S6tClient extends S6tAbstractClient {
 	}
 	
 	public void init(String clientID) throws Exception {
+	    if (logger.isInfoEnabled()) {
+	      logger.info("Reading config file S6tClient : " + this.configFile);
+	    }
 		this.init(new FileInputStream(configFile), clientID);
 	}
 

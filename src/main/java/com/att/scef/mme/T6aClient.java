@@ -32,7 +32,6 @@ import org.jdiameter.common.impl.app.t6a.JReportingInformationRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.att.scef.gson.GMmeUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.interfaces.T6aAbstractClient;
 import com.att.scef.utils.MonitoringType;
@@ -61,7 +60,8 @@ public class T6aClient extends T6aAbstractClient {
     try {
       JMT_DataAnswer tda = new JMT_DataAnswerImpl((Request)request.getMessage(), resultCode);
       Answer answer = (Answer)tda.getMessage();
-      AvpSet set = answer.getAvps();
+      //AvpSet set = answer.getAvps();
+
       session.sendMTDataAnswer(this.t6aSessionFactory.createMT_DataAnswer(answer));
     } catch (InternalException e) {
       // TODO Auto-generated catch block

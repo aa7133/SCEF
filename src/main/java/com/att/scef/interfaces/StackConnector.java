@@ -1,6 +1,5 @@
 package com.att.scef.interfaces;
 
-import java.io.InputStream;
 import java.util.Set;
 
 import org.jdiameter.api.Answer;

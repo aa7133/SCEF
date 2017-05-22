@@ -70,7 +70,7 @@ public class SCEF {
 	private RedisPubSubCommands<String, String> syncPubSubHandler;
 
 	private RedisClient redisClient;
-    private RedisPubSubAsyncCommands<String, String> asyncpublisher;
+    //private RedisPubSubAsyncCommands<String, String> asyncpublisher;
     private StatefulRedisPubSubConnection<String, String> connection;
     private RedisPubSubAsyncCommands<String, String> handler;
 	
@@ -128,6 +128,9 @@ public class SCEF {
 	@SuppressWarnings("unchecked")
 	public SCEF(String s6tConfigFile, String t6aConfigFile, String dictionaryFile, String host, int port, String channel) {
 		super();
+		logger.info("config file S6t = " + s6tConfigFile + "  config file T6a = " + t6aConfigFile 
+		          + " Dictionery file = " + dictionaryFile 
+		          + " redis host = " + host + " redis port = " + port);
 		this.asyncDataConnector = new ConnectorImpl();
 		this.asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
@@ -146,7 +149,10 @@ public class SCEF {
 		try {
 			this.s6tClient.init(DEFAULT_S6T_CLIENT_NAME);
 		    this.s6tClient.start(Mode.ANY_PEER, 10, TimeUnit.SECONDS);
-		    
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+        try {
 		    this.t6aServer.init(DEFAULT_T6A_SERVER_NAME);
 		    this.t6aServer.start();
 		} catch (Exception e) {
@@ -661,11 +667,11 @@ public class SCEF {
       String msg;
       String externalId = userProfile.getExternalId();
       if (resultCode == ResultCode.SUCCESS) {
-        msg = new StringBuffer("3|").append(userProfile.getExternalId())
+        msg = new StringBuffer("3|").append(externalId)
             .append("|").append(message).toString();
       }
       else {
-        msg = new StringBuffer("2|").append(userProfile.getExternalId())
+        msg = new StringBuffer("2|").append(externalId)
             .append("|").append(message).toString(); 
       }
       if (logger.isInfoEnabled()) {
