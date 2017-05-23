@@ -83,7 +83,7 @@ public class T6aClient extends T6aAbstractClient {
    * @param activeState state of the user Active, NOT_ACTIVE
    * @param change is it change the state or update the current state
    */
-  public void sendCMR(String msisdn, int activeState, int change) {
+  public void sendCMR(String msisdn, int activeState, int change, String[] paramters) {
     if (logger.isInfoEnabled()) {
       logger.info("Send CMR to SCEF");
     }
@@ -91,6 +91,22 @@ public class T6aClient extends T6aAbstractClient {
     if (msisdn == null || msisdn.length() == 0) {
       logger.error("No MSISDN");
       return;
+    }
+    
+    int dwRate = 3000;
+    int upRate = 5000;
+    if (paramters.length > 4) {
+      for (int i = 3; i < paramters.length; i++) {
+        String[] str = paramters[i].split("=");
+        str[0].toUpperCase();
+        //UPrate=num|DNRate
+        if (str[0].equals("UPRATE")) {
+          upRate = Integer.parseUnsignedInt(str[1]);
+        }
+        else if (str[0].equals("DNRATE")) {
+          dwRate = Integer.parseUnsignedInt(str[1]);
+        }
+      }
     }
 
     try {

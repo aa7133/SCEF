@@ -88,6 +88,7 @@ public class MME {
   private final static String DEFAULT_PROFILE_PREFIX = "MME-USER-";
   public final static int CONNECTION_ACTIVE = 1;
   public final static int CONNECTION_NOT_ACTIVE = 0;
+  private final static int CONNECTION_UPDATE = 0;
 
   public final static int STATE_CHANGE_FAIL = 0;
   public final static int STATE_CHANGE_SUCESS = 1;
@@ -219,7 +220,7 @@ public class MME {
       int activeState = Integer.parseInt(paramters[2]);
       int change = changeActiveState(msisdn, userData, activeState);
       if (change != MME.STATE_CHANGE_FAIL) {
-        this.t6aClient.sendCMR(msisdn, activeState, change);
+        this.t6aClient.sendCMR(msisdn, activeState, change, paramters);
       }
       else {
         logger.error("NO change in user state is done" + msisdn);
@@ -236,7 +237,7 @@ public class MME {
       StringBuffer sb = new StringBuffer();
       logger.error("Wrong command request" + paramters[0] + " for message : "+ message);
       sb.append("send data from device \"D|msisdn|message\"\n")
-           .append("Change device State \"A|msisdn|[0,1]\"  0 - deactivate device 1 - activate device\n")
+           .append("Change device State \"A|msisdn|[0,1,2]|UPrate=num|DNRate=num\"  0 - deactivate device 1 - activate device 2 - update rate\n")
            .append("Send Monitoring Event \"M|msisdn|[0-7]\"  \n\t\tLOSS_OF_CONNECTIVITY (0)\n\t\tUE_REACHABILITY (1)\n\t\t")
            .append("LOCATION_REPORTING (2)\n\t\tCHANGE_OF_IMSI_IMEI(SV)_ASSOCIATION (3)\n\t\tROAMING_STATUS (4)\n\t\t")
            .append("COMMUNICATION_FAILURE (5)\n\t\tAVAILABILITY_AFTER_DDN_FAILURE (6)\n\t\tNUMBER_OF_UES_PRESENT_IN_A_GEOGRAPHICAL_AREA (7)");

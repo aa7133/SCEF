@@ -41,6 +41,7 @@ import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.gson.GSCEFUserProfile;
 import com.att.scef.gson.GUserIdentifier;
+import com.att.scef.utils.ConnectionAction;
 import com.att.scef.utils.MonitoringType;
 import com.att.scef.utils.UserIdentifier;
 import com.google.gson.Gson;
@@ -1021,6 +1022,28 @@ public class SCEF {
 
 			this.t6aServer.sendCMA(session, request, ResultCode.SUCCESS);
 
+		    String channel = userProfile.getMonitoroingQueue();
+		    String extId = userProfile.getExternalId();
+		    if (logger.isInfoEnabled()) {
+		      logger.info("Data queue for user : " + userProfile.getMsisdn() + " is : " + channel + " ExternalID = " + extId);
+		    }
+		    String message = null;
+		    if (connectionAction == ConnectionAction.CONNECTION_ACTION_ESTABLISHMENT) {
+		      message = new StringBuffer("0|").append(extId).append("|").append(1)
+		          .append("|UPPER_RATE_LIMIT=").append(uplinkRate).append("|DOWN_RATE_LIMIT=").append(uplinkRate)
+		          .append("|CONNECTION_ACTION_ESTABLISHMENT with CMR").toString();
+		    }
+		    else if (connectionAction == ConnectionAction.CONNECTION_ACTION_RELEASE) {
+              message = new StringBuffer("0|").append(extId).append("|").append(0).append("ONNECTION_ACTION_RELEASE with CMR").toString();
+            }
+
+            else {
+              message = new StringBuffer("0|").append(extId).append("|").append(9)
+                  .append("|UPPER_RATE_LIMIT=").append(uplinkRate).append("|DOWN_RATE_LIMIT=").append(uplinkRate)
+                  .append("CONNECTION_ACTION_UPDATE with cmr").toString();
+            }
+	        this.handler.publish(channel, message);
+			
 			//TODO send message to SCS/AS that user active not active
 
 		} catch (AvpDataException e) {
