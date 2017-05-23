@@ -128,9 +128,11 @@ public class SCEF {
 	@SuppressWarnings("unchecked")
 	public SCEF(String s6tConfigFile, String t6aConfigFile, String dictionaryFile, String host, int port, String channel) {
 		super();
-		logger.info("config file S6t = " + s6tConfigFile + "  config file T6a = " + t6aConfigFile 
-		          + " Dictionery file = " + dictionaryFile 
-		          + " redis host = " + host + " redis port = " + port);
+	    logger.info(new StringBuffer("java -jar mme.jar [--s6t-conf config file] [--t6a-conf conf file]")
+              .append("\n[--dir diameter dictionary file] [--redis-host host address] [--redis-port port] [--redis-channel pubsub channel]").toString());
+		logger.info("config file S6t = " + s6tConfigFile + "\n\t\tconfig file T6a = " + t6aConfigFile
+		          + "\n\t\tDictionery file = " + dictionaryFile
+		          + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
 		this.asyncDataConnector = new ConnectorImpl();
 		this.asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
@@ -980,8 +982,52 @@ public class SCEF {
 
   public void handleT6aConnectionManagementRequestEvent(ServerT6aSession session, JConnectionManagementRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("not yet implemented \"T6a CMR\" event, request[" + request + "], on session[" + session + "]");
-  }
+		if (logger.isInfoEnabled()) {
+			logger.info("Got Connection Managemant Request (CMR) from MME");
+		}
+
+		try {
+			AvpSet reqSet = request.getMessage().getAvps();
+
+			Avp userIdentity = reqSet.getAvp(Avp.USER_IDENTIFIER);
+			GUserIdentifier uid = UserIdentifier.extractFromAvpSingle(userIdentity);
+			String data = this.getSyncHandler().get(SCEF_MSISDN_PREFIX + uid.getMsisdn());
+			if (data == null || data.length() == 0) {
+				logger.error("No data on user : " +  uid.getMsisdn());
+				this.t6aServer.sendCMA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+				return;
+			}
+
+			GSCEFUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
+
+			Avp connectionActionAvp = reqSet.getAvp(Avp.CONNECTION_ACTION);
+			if (connectionActionAvp == null) {
+				this.t6aServer.sendCMA(session, request, ResultCode.DIAMETER_ERROR_OPERATION_NOT_ALLOWED);
+			}
+			int connectionAction = (int)connectionActionAvp.getUnsigned32();
+
+			Avp rateControlAvp = reqSet.getAvp(Avp.SERVING_PLMN_RATE_CONTROL);
+			int uplinkRate = 0;
+			int downLinkRate = 0;
+			if (rateControlAvp != null) {
+				AvpSet rateControlGroup = rateControlAvp.getGrouped();
+				uplinkRate = (int)rateControlGroup.getAvp(Avp.UPLINK_RATE_LIMIT).getUnsigned32();
+				downLinkRate = (int)rateControlGroup.getAvp(Avp.DOWNLINK_RATE_LIMIT).getUnsigned32();
+			}
+			logger.info(new StringBuffer("Got CMR for user : ").append(uid.getMsisdn())
+						.append(" Withe connection Action = ").append(connectionAction)
+						.append(" Upper Link rate = ").append(uplinkRate)
+						.append(" Down Link rate = ").append(downLinkRate).toString());
+
+			this.t6aServer.sendCMA(session, request, ResultCode.SUCCESS);
+
+			//TODO send message to SCS/AS that user active not active
+
+		} catch (AvpDataException e) {
+			e.printStackTrace();
+		}
+
+	}
 
   
   

@@ -122,9 +122,11 @@ public class HSS {
 	@SuppressWarnings("unchecked")
 	public HSS(String s6tConfigFile, String s6aConfigFile, String dictionaryFile, String host, int port, String channel) {
 		super();
-	      logger.info("config file S6t = " + s6tConfigFile + "  config file S6a = " + s6aConfigFile 
-              + " Dictionery file = " + dictionaryFile 
-              + " redis host = " + host + " redis port = " + port);
+        logger.info(new StringBuffer("java -jar mme.jar [--s6a-conf config file] [--s6t-conf conf file]")
+            .append("\n[--dir diameter dictionary file] [--redis-host host address] [--redis-port port] [--redis-channel pubsub channel]").toString());
+	    logger.info("config file S6t = " + s6tConfigFile + "\n\t\tconfig file S6a = " + s6aConfigFile
+              + "\n\t\tDictionery file = " + dictionaryFile
+              + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
 		asyncDataConnector = new ConnectorImpl();
 		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 

@@ -86,9 +86,13 @@ public class MME {
   private final static String DEFAULT_DICTIONARY_FILE = "src/main/resources/dictionary.xml";
 
   private final static String DEFAULT_PROFILE_PREFIX = "MME-USER-";
-  private final static int ACTIVE = 1;
-  private final static int NOT_ACTIVE = 0;
-  
+  public final static int CONNECTION_ACTIVE = 1;
+  public final static int CONNECTION_NOT_ACTIVE = 0;
+
+  public final static int STATE_CHANGE_FAIL = 0;
+  public final static int STATE_CHANGE_SUCESS = 1;
+  public final static int STATE_CHANGE_UPDATE = 2;
+
   public static void main(String[] args) {
     String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
     String t6aConfigFile = DEFAULT_T6A_CONFIG_FILE;
@@ -127,9 +131,11 @@ public class MME {
   @SuppressWarnings("unchecked")
   public MME(String s6aConfigFile, String t6aConfigFile, String dictionaryFile, String host, int port, String channel) {
       super();
-      logger.info("config file S6a = " + s6aConfigFile + "  config file T6a = " + t6aConfigFile 
-                + " Dictionery file = " + dictionaryFile 
-                + " redis host = " + host + " redis port = " + port);
+      logger.info(new StringBuffer("java -jar mme.jar [--s6a-conf config file] [--t6a-conf conf file]")
+              .append("\n[--dir diameter dictionary file] [--redis-host host address] [--redis-port port] [--redis-channel pubsub channel]").toString());
+      logger.info("config file S6a = " + s6aConfigFile + "\n\t\tconfig file T6a = " + t6aConfigFile
+                + "\n\t\tDictionery file = " + dictionaryFile
+                + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
       
       asyncDataConnector = new ConnectorImpl();
       asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
@@ -137,7 +143,7 @@ public class MME {
       syncDataConnector = new ConnectorImpl();
       syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
       
-      //Redis pub sub
+      //Redis pub sub\n\t\t
       this.redisClient = RedisClient.create(RedisURI.Builder.redis(host, port).build());
       this.connection = this.redisClient.connectPubSub();
 
@@ -187,7 +193,7 @@ public class MME {
       }
 
   }
-  
+
   private void handleMmeMessages(String channel, String message) {
     if (logger.isInfoEnabled()) {
       logger.info(new StringBuffer("message = \"").append(message).append("\" for channel = ")
@@ -211,7 +217,13 @@ public class MME {
       break;
     case "A":
       int activeState = Integer.parseInt(paramters[2]);
-      changeActiveState(msisdn, userData, activeState);
+      int change = changeActiveState(msisdn, userData, activeState);
+      if (change != MME.STATE_CHANGE_FAIL) {
+        this.t6aClient.sendCMR(msisdn, activeState, change);
+      }
+      else {
+        logger.error("NO change in user state is done" + msisdn);
+      }
       break;
     case "M":
       int monitorEvent = Integer.parseInt(paramters[2]);
@@ -239,7 +251,7 @@ public class MME {
       return;
     }
     GMmeUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
-    if (userProfile.getActive() == NOT_ACTIVE) {
+    if (userProfile.getActive() == CONNECTION_NOT_ACTIVE) {
       logger.info("user not in active state");
       return;
     }
@@ -257,10 +269,11 @@ public class MME {
     this.t6aClient.sendRIR(msisdn, gmon, monitoringEvent);       
   }
 
-  private void changeActiveState(String msisdn, String userData, int activeState) {
+  private int changeActiveState(String msisdn, String userData, int activeState) {
+    int result = STATE_CHANGE_FAIL;
     if (userData == null) {
       logger.error("User not exists" + msisdn);
-      return;
+      return result;
     }
     RedisFuture<String> future = null;
     Runnable listener = new Runnable() {
@@ -271,10 +284,16 @@ public class MME {
     };
 
     GMmeUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
-    userProfile.setActive(activeState);
-    future = this.asyncHandler.set(msisdn, new Gson().toJson(userProfile));
-
-    future.thenRun(listener);    
+    if (activeState != userProfile.getActive()) {
+      userProfile.setActive(activeState);
+      future = this.asyncHandler.set(msisdn, new Gson().toJson(userProfile));
+      result = STATE_CHANGE_SUCESS;
+      future.thenRun(listener);
+    }
+    else {
+      result = STATE_CHANGE_UPDATE;
+    }
+    return result;
   }
   
 
@@ -449,7 +468,7 @@ public class MME {
       GMmeUserProfile userProfile = null;
       if (userData == null) {
         userProfile = new GMmeUserProfile();
-        userProfile.setActive(ACTIVE);
+        userProfile.setActive(CONNECTION_NOT_ACTIVE);
       }
       else {
         userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);

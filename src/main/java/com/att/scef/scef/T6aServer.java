@@ -26,6 +26,7 @@ import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
+import org.jdiameter.common.impl.app.t6a.JConnectionManagementAnswerImpl;
 import org.jdiameter.common.impl.app.t6a.JMO_DataAnswerImpl;
 import org.jdiameter.common.impl.app.t6a.JMT_DataRequestImpl;
 import org.jdiameter.common.impl.app.t6a.JReportingInformationAnswerImpl;
@@ -73,7 +74,25 @@ public class T6aServer extends T6aAbstractServer {
     }
     
   }
-  
+
+  public void sendCMA(ServerT6aSession session, JConnectionManagementRequest request, int resultCode) {
+    try {
+      JConnectionManagementAnswer cma = new JConnectionManagementAnswerImpl((Request)request.getMessage(), resultCode);
+      Answer answer = (Answer)cma.getMessage();
+
+      session.sendConnectionManagementAnswer(this.t6aSessionFactory.createConnectionManagementAnswer(answer));
+    } catch (InternalException e) {
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      e.printStackTrace();
+    } catch (RouteException e) {
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      e.printStackTrace();
+    }
+  }
+
+
   public void sendRIA(ServerT6aSession session, JReportingInformationRequest request, int resultCode) {
     try {
       JReportingInformationAnswer ria = new JReportingInformationAnswerImpl((Request)request.getMessage(), resultCode);

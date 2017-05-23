@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="ATT-SCEF" pattern="file[scef]:*||file[scef]:*/" />
+</component>

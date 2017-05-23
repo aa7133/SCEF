@@ -2,6 +2,7 @@ package com.att.scef.mme;
 
 import java.io.FileInputStream;
 
+import com.att.scef.utils.ConnectionAction;
 import org.jdiameter.api.Answer;
 import org.jdiameter.api.Avp;
 import org.jdiameter.api.AvpSet;
@@ -26,6 +27,7 @@ import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
 import org.jdiameter.api.t6a.events.JReportingInformationAnswer;
 import org.jdiameter.api.t6a.events.JReportingInformationRequest;
+import org.jdiameter.common.impl.app.t6a.JConnectionManagementRequestImpl;
 import org.jdiameter.common.impl.app.t6a.JMO_DataRequestImpl;
 import org.jdiameter.common.impl.app.t6a.JMT_DataAnswerImpl;
 import org.jdiameter.common.impl.app.t6a.JReportingInformationRequestImpl;
@@ -64,21 +66,79 @@ public class T6aClient extends T6aAbstractClient {
 
       session.sendMTDataAnswer(this.t6aSessionFactory.createMT_DataAnswer(answer));
     } catch (InternalException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (IllegalDiameterStateException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (RouteException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (OverloadException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
 
   }
-  
+
+  /**
+   *
+   * @param msisdn using the phone number since we dont have IMSI at this point
+   * @param activeState state of the user Active, NOT_ACTIVE
+   * @param change is it change the state or update the current state
+   */
+  public void sendCMR(String msisdn, int activeState, int change) {
+    if (logger.isInfoEnabled()) {
+      logger.info("Send CMR to SCEF");
+    }
+
+    if (msisdn == null || msisdn.length() == 0) {
+      logger.error("No MSISDN");
+      return;
+    }
+
+    try {
+      ClientT6aSession clientT6aSession = this.sessionFactory.getNewAppSession(getApplicationId(),
+            ClientT6aSession.class);
+
+      JConnectionManagementRequest cmr = new JConnectionManagementRequestImpl(super.createRequest(clientT6aSession,
+                JConnectionManagementRequest.code, msisdn, "Ber-"+msisdn));
+
+      AvpSet reqSet = cmr.getMessage().getAvps();
+
+      reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
+      int connection = ConnectionAction.CONNECTION_ACTION_ESTABLISHMENT;
+      if (change == MME.STATE_CHANGE_SUCESS) {
+        if (activeState == MME.CONNECTION_NOT_ACTIVE) {
+          connection = ConnectionAction.CONNECTION_ACTION_RELEASE;
+        }
+      }
+      else {
+        connection = ConnectionAction.CONNECTION_ACTION_UPDATE;
+      }
+      reqSet.addAvp(Avp.CONNECTION_ACTION, connection, getApplicationId().getVendorId(),
+            true, false, true);
+
+      reqSet.addAvp(Avp.SERVICE_SELECTION, new StringBuffer("APN.").append(msisdn).toString(),false);
+      AvpSet ServingRate = reqSet.addGroupedAvp(Avp.SERVING_PLMN_RATE_CONTROL, getApplicationId().getVendorId(), true, false);
+      ServingRate.addAvp(Avp.UPLINK_RATE_LIMIT, 1000, getApplicationId().getVendorId(), true, false);
+      ServingRate.addAvp(Avp.DOWNLINK_RATE_LIMIT, 300, getApplicationId().getVendorId(), true, false);
+
+      reqSet.addAvp(Avp.MAXIMUM_UE_AVAILABILITY_TIME,"1234", getApplicationId().getVendorId(), false, false, true);
+
+      clientT6aSession.sendConnectionManagementRequest(cmr);
+    } catch (InternalException e) {
+      e.printStackTrace();
+    } catch (IllegalDiameterStateException e) {
+      e.printStackTrace();
+    } catch (RouteException e) {
+      e.printStackTrace();
+    } catch (OverloadException e) {
+      e.printStackTrace();
+    }
+
+    if (logger.isInfoEnabled()) {
+      logger.info("Sent ODR to SCEF");
+    }
+
+  }
+
   public void sendODR(String msisdn, String msg) {
     if (logger.isInfoEnabled()) {
       logger.info("Send ODR to SCEF");
@@ -92,7 +152,8 @@ public class T6aClient extends T6aAbstractClient {
     try {
       ClientT6aSession clientT6aSession = this.sessionFactory.getNewAppSession(getApplicationId(),
           ClientT6aSession.class);
-      JMO_DataRequest odr = new JMO_DataRequestImpl(super.createRequest(clientT6aSession, JMO_DataRequest.code, msisdn, "Bearer-ID1"));
+      JMO_DataRequest odr = new JMO_DataRequestImpl(super.createRequest(clientT6aSession,
+            JMO_DataRequest.code, msisdn, "Bearer-ID1"));
 
       AvpSet reqSet = odr.getMessage().getAvps();
       
