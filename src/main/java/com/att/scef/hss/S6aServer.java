@@ -282,8 +282,7 @@ public class S6aServer extends S6aAbstractServer {
   public void doInsertSubscriberDataAnswerEvent(ServerS6aSession session, JInsertSubscriberDataRequest request,
       JInsertSubscriberDataAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("Received \"S6a IDA\" event, request[" + request + "], answer[" + answer + "], on session["
-        + session + "]");
+    this.hss.handleInsertSubscriberDataAnswerEvent(session, request, answer);
   }
 
   @Override

@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import com.att.scef.utils.ConnectionAction;
 import org.jdiameter.api.Answer;
 import org.jdiameter.api.Avp;
+import org.jdiameter.api.AvpDataException;
 import org.jdiameter.api.AvpSet;
 import org.jdiameter.api.IllegalDiameterStateException;
 import org.jdiameter.api.InternalException;
@@ -34,9 +35,16 @@ import org.jdiameter.common.impl.app.t6a.JReportingInformationRequestImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.att.scef.data.ConnectorImpl;
+import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GMonitoringEventConfig;
 import com.att.scef.interfaces.T6aAbstractClient;
 import com.att.scef.utils.MonitoringType;
+import com.lambdaworks.redis.RedisClient;
+import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
+import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
 
 
 public class T6aClient extends T6aAbstractClient {
@@ -46,9 +54,16 @@ public class T6aClient extends T6aAbstractClient {
   
   private String configFile;
   
+  private RedisStringCommands<String, String> syncHandler;
+  private ConnectorImpl syncDataConnector;
+
+
   public T6aClient(MME mmeCtx, String configFile) {
       this.mme = mmeCtx;
       this.configFile = configFile;
+      this.syncDataConnector = new ConnectorImpl();
+      this.syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class);
+     
   }
   
   public void init(String clientID) throws Exception {
@@ -63,6 +78,13 @@ public class T6aClient extends T6aAbstractClient {
       JMT_DataAnswer tda = new JMT_DataAnswerImpl((Request)request.getMessage(), resultCode);
       Answer answer = (Answer)tda.getMessage();
       //AvpSet set = answer.getAvps();
+      AvpSet reqSet = request.getMessage().getAvps();
+      Avp userIdentifierAvp = reqSet.getAvp(Avp.USER_IDENTIFIER);
+      
+      if (userIdentifierAvp != null) {
+        AvpSet ansSet = answer.getAvps();
+        ansSet.addAvp(userIdentifierAvp);
+      }
 
       session.sendMTDataAnswer(this.t6aSessionFactory.createMT_DataAnswer(answer));
     } catch (InternalException e) {
@@ -100,10 +122,11 @@ public class T6aClient extends T6aAbstractClient {
         String[] str = paramters[i].split("=");
         str[0].toUpperCase();
         //UPrate=num|DNRate
-        if (str[0].equals("UPRATE")) {
+        logger.info(str[0]);
+        if (str[0].equals("UPRate")) {
           upRate = Integer.parseUnsignedInt(str[1]);
         }
-        else if (str[0].equals("DNRATE")) {
+        else if (str[0].equals("DNRate")) {
           dwRate = Integer.parseUnsignedInt(str[1]);
         }
       }
@@ -133,8 +156,8 @@ public class T6aClient extends T6aAbstractClient {
 
       reqSet.addAvp(Avp.SERVICE_SELECTION, new StringBuffer("APN.").append(msisdn).toString(),false);
       AvpSet ServingRate = reqSet.addGroupedAvp(Avp.SERVING_PLMN_RATE_CONTROL, getApplicationId().getVendorId(), true, false);
-      ServingRate.addAvp(Avp.UPLINK_RATE_LIMIT, 1000, getApplicationId().getVendorId(), true, false);
-      ServingRate.addAvp(Avp.DOWNLINK_RATE_LIMIT, 300, getApplicationId().getVendorId(), true, false);
+      ServingRate.addAvp(Avp.UPLINK_RATE_LIMIT, upRate, getApplicationId().getVendorId(), true, false);
+      ServingRate.addAvp(Avp.DOWNLINK_RATE_LIMIT, dwRate, getApplicationId().getVendorId(), true, false);
 
       reqSet.addAvp(Avp.MAXIMUM_UE_AVAILABILITY_TIME,"1234", getApplicationId().getVendorId(), false, false, true);
 
@@ -156,10 +179,6 @@ public class T6aClient extends T6aAbstractClient {
   }
 
   public void sendODR(String msisdn, String msg) {
-    if (logger.isInfoEnabled()) {
-      logger.info("Send ODR to SCEF");
-    }
-    
     if (msisdn == null || msisdn.length() == 0) {
       logger.error("No MSISDN");
       return;
@@ -172,8 +191,11 @@ public class T6aClient extends T6aAbstractClient {
             JMO_DataRequest.code, msisdn, "Bearer-ID1"));
 
       AvpSet reqSet = odr.getMessage().getAvps();
-      
 
+      String sessionID = "T" + reqSet.getAvp(Avp.SESSION_ID).getUTF8String();
+      String start = String.valueOf(System.nanoTime());
+      
+      this.syncHandler.set(sessionID, start);
       reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
       
       reqSet.addAvp(Avp.NON_IP_DATA, msg, false);
@@ -182,22 +204,17 @@ public class T6aClient extends T6aAbstractClient {
       clientT6aSession.sendMODataRequest(odr);
 
     } catch (InternalException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (IllegalDiameterStateException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (RouteException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (OverloadException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+    } catch (AvpDataException e) {
+       e.printStackTrace();
     }
 
-    if (logger.isInfoEnabled()) {
-      logger.info("Sent ODR to SCEF");
-    }
   }
   
   public void sendRIR(String msisdn, GMonitoringEventConfig gmon, int monitoringEvent) {

@@ -54,7 +54,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
 import com.lambdaworks.redis.RedisFuture;
+import com.lambdaworks.redis.api.async.RedisAsyncCommands;
 import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisCommands;
 import com.lambdaworks.redis.api.sync.RedisStringCommands;
 
 //public class HSS extends AbstractServer implements ServerS6aSessionListener, ServerS6tSessionListener,
@@ -67,8 +69,8 @@ public class HSS {
 
 	private ConnectorImpl syncDataConnector;
 	private ConnectorImpl asyncDataConnector;
-	private RedisStringAsyncCommands<String, String> asyncHandler;
-	private RedisStringCommands<String, String> syncHandler;
+	private RedisAsyncCommands<String, String> asyncHandler;
+	private RedisCommands<String, String> syncHandler;
 	
 	
     private S6tServer s6tServer;
@@ -128,10 +130,10 @@ public class HSS {
               + "\n\t\tDictionery file = " + dictionaryFile
               + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
 		asyncDataConnector = new ConnectorImpl();
-		asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
+		asyncHandler = (RedisAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
 		syncDataConnector = new ConnectorImpl();
-		syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
+		syncHandler = (RedisCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
 
 
         this.s6tServer = new S6tServer(this, s6tConfigFile);

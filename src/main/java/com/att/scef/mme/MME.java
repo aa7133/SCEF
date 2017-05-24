@@ -2,7 +2,10 @@ package com.att.scef.mme;
 
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -49,6 +52,7 @@ import com.att.scef.data.ConnectorImpl;
 import com.att.scef.data.SyncDataConnector;
 import com.att.scef.gson.GMmeUserProfile;
 import com.att.scef.gson.GMonitoringEventConfig;
+import com.att.scef.utils.BCDStringConverter;
 import com.att.scef.utils.LocationInformationConfiguration;
 import com.att.scef.utils.UE_ReachabilityConfiguration;
 import com.google.gson.Gson;
@@ -56,8 +60,8 @@ import com.google.gson.JsonParser;
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisFuture;
 import com.lambdaworks.redis.RedisURI;
-import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
-import com.lambdaworks.redis.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.api.async.RedisAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisCommands;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
 import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
 
@@ -68,8 +72,8 @@ public class MME {
   private ConnectorImpl asyncDataConnector;
  
   private RedisClient redisClient;
-  private RedisStringAsyncCommands<String, String> asyncHandler;
-  private RedisStringCommands<String, String> syncHandler;
+  private RedisAsyncCommands<String, String> asyncHandler;
+  private RedisCommands<String, String> syncHandler;
 
   private StatefulRedisPubSubConnection<String, String> connection;
   private RedisPubSubAsyncCommands<String, String> handler;
@@ -93,6 +97,7 @@ public class MME {
   public final static int STATE_CHANGE_FAIL = 0;
   public final static int STATE_CHANGE_SUCESS = 1;
   public final static int STATE_CHANGE_UPDATE = 2;
+  private Map<Long, Integer> testResults = null;
 
   public static void main(String[] args) {
     String s6aConfigFile = DEFAULT_S6A_CONFIG_FILE;
@@ -139,10 +144,10 @@ public class MME {
                 + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
       
       asyncDataConnector = new ConnectorImpl();
-      asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
+      asyncHandler = (RedisAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
       syncDataConnector = new ConnectorImpl();
-      syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
+      syncHandler = (RedisCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
       
       //Redis pub sub\n\t\t
       this.redisClient = RedisClient.create(RedisURI.Builder.redis(host, port).build());
@@ -210,10 +215,10 @@ public class MME {
       return;
     }
     String userData = this.syncHandler.get(DEFAULT_PROFILE_PREFIX + msisdn);
-   
+    String msg = null;
     switch (paramters[0].toUpperCase()) {
     case "D":
-      String msg = paramters[2];
+      msg = paramters[2];
       this.t6aClient.sendODR(msisdn, msg);
       break;
     case "A":
@@ -233,6 +238,67 @@ public class MME {
       }
       sendMonitoringEvent(msisdn, userData, monitorEvent);
       break;
+    case "T":
+      msg = paramters[2];
+      int retry = Integer.parseInt(paramters[3]);
+      testResults = new TreeMap<Long, Integer>(new Comparator<Long>() {
+           @Override
+           public int compare(Long o1, Long o2) {
+             if (o1 == o2) {
+               return 0;
+             }
+             if (o1 > o2) {
+               return 1;
+             }
+             return -1;
+           }
+         });
+      
+      long start = System.nanoTime();
+      for (int i = 0; i < retry; i++) {
+        this.t6aClient.sendODR(msisdn, msg);
+      }
+      long end = (System.nanoTime() - start);
+
+      try {
+        Thread.sleep(20000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+
+      logger.info("Test for " + retry + " took : " + end + " nanoseconds. transactions per second = : " + end/retry);
+      
+      
+      int count = 0;
+      long sum = 0;
+      for (Long i: testResults.keySet()) {
+        Integer result = testResults.get(i);
+        if (result != null) {
+          count += result;
+          sum += result * i;
+        }
+      }
+      if (count != retry) {
+        logger.info("Not all calls completed.  requested : " + retry + " Actual : " + count);
+      }
+      Long median = 0l;
+      int counter = 0; 
+      for (Long i: testResults.keySet()) {
+        Integer result = testResults.get(i);
+        if (result != null) {
+          counter += result;
+          if (counter >= count/2) {
+            median = i;
+          }
+          sum += result * i;
+        }
+      }
+
+      logger.info("Average =  " + sum/count + " Median =  " + median);
+      
+      
+      break;
+      
     default:
       StringBuffer sb = new StringBuffer();
       logger.error("Wrong command request" + paramters[0] + " for message : "+ message);
@@ -286,8 +352,9 @@ public class MME {
 
     GMmeUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
     if (activeState != userProfile.getActive()) {
+      logger.info("set new state to : " + activeState);
       userProfile.setActive(activeState);
-      future = this.asyncHandler.set(msisdn, new Gson().toJson(userProfile));
+      future = this.asyncHandler.set(DEFAULT_PROFILE_PREFIX + msisdn, new Gson().toJson(userProfile));
       result = STATE_CHANGE_SUCESS;
       future.thenRun(listener);
     }
@@ -561,9 +628,29 @@ public class MME {
     if (logger.isInfoEnabled()) {
       logger.info("Got MO-Data-Answer (ODA)");
     }
-    AvpSet reqSet = request.getMessage().getAvps();
-    AvpSet ansSet = answer.getMessage().getAvps();
-    
+    try {
+      long end = System.nanoTime();
+      AvpSet reqSet = request.getMessage().getAvps();
+      AvpSet ansSet = answer.getMessage().getAvps();
+
+      String sessionID = "T" + ansSet.getAvp(Avp.SESSION_ID).getUTF8String();
+      long start = Long.parseLong(this.syncHandler.get(sessionID));
+      this.syncHandler.del(sessionID);
+      //this.syncHandler.
+      end = (end - start)/1000000;
+      Integer index = testResults.get(end);
+
+      if (index != null) {
+        testResults.put(end, index + 1);
+      }
+      else {
+        testResults.put(end, 1);
+      }
+    } catch (AvpDataException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+
   }
 
   public void handleMT_DataRequestEvent(ClientT6aSession session, JMT_DataRequest request)
@@ -574,12 +661,38 @@ public class MME {
     try {
       AvpSet reqSet = request.getMessage().getAvps();
 
-      Avp userIdentifier = reqSet.getAvp(Avp.USER_IDENTIFIER);
-      if (userIdentifier == null) {
+      Avp userIdentifierAvp = reqSet.getAvp(Avp.USER_IDENTIFIER);
+      if (userIdentifierAvp == null) {
         if (logger.isInfoEnabled()) {
           logger.info("MO-Data-Request (ODR) missing the mandatory \"User-Identifier\" parameter");
         }
         this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+      
+      AvpSet userIdentifierGrouped = userIdentifierAvp.getGrouped();
+      Avp msisdnAvp = userIdentifierGrouped.getAvp(Avp.MSISDN);
+      if (msisdnAvp == null) {
+        logger.error("No user identity valid");
+        this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+      String msisdn = BCDStringConverter.toStringNumber(msisdnAvp.getOctetString());
+      
+      String userData = this.syncHandler.get(DEFAULT_PROFILE_PREFIX + msisdn);
+      GMmeUserProfile userProfile = null;
+      if (userData == null) {
+        logger.error("No user data in mme for user : " + msisdn);
+        this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
+        return;
+      }
+      else {
+        userProfile = new Gson().fromJson(new JsonParser().parse(userData), GMmeUserProfile.class);
+      }
+      
+      if (userProfile.getActive() == CONNECTION_NOT_ACTIVE) {
+        logger.error("Device : " + msisdn + " Not in Active state");
+        this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_UNAUTHORIZED_REQUESTING_ENTITY);
         return;
       }
 
@@ -606,8 +719,9 @@ public class MME {
   public void handleConnectionManagementAnswerEvent(ClientT6aSession session, JConnectionManagementRequest request,
       JConnectionManagementAnswer answer)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
-    logger.error("Received \"T6a CMA\" event, request[" + request + "], answer[" + answer + "], on session["
-        + session + "]");
+    if (logger.isInfoEnabled()) {
+      logger.info("Got Connection-Managment-Answer (CMA) from SCEF ");
+    }
   }
 
   public void handleConnectionManagementRequestEvent(ClientT6aSession session, JConnectionManagementRequest request)

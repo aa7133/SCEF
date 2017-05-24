@@ -50,11 +50,11 @@ import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisFuture;
 import com.lambdaworks.redis.RedisURI;
 import com.lambdaworks.redis.SetArgs;
-import com.lambdaworks.redis.api.async.RedisStringAsyncCommands;
-import com.lambdaworks.redis.api.sync.RedisStringCommands;
+import com.lambdaworks.redis.api.async.RedisAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisCommands;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
-import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
-import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
+//import com.lambdaworks.redis.pubsub.api.async.RedisPubSubAsyncCommands;
+//import com.lambdaworks.redis.pubsub.api.sync.RedisPubSubCommands;
 
 
 public class SCEF {
@@ -63,17 +63,17 @@ public class SCEF {
  
 	private ConnectorImpl syncDataConnector;
 	private ConnectorImpl asyncDataConnector;
-	private RedisStringAsyncCommands<String, String> asyncHandler;
-	private RedisStringCommands<String, String> syncHandler;
+	private RedisAsyncCommands<String, String> asyncHandler;
+	private RedisCommands<String, String> syncHandler;
 
 	private PubSubConnectorImpl asyncPubSubConnector;
-	private RedisPubSubAsyncCommands<String, String> asyncPubSubHandler;
-	private RedisPubSubCommands<String, String> syncPubSubHandler;
+	private RedisAsyncCommands<String, String> asyncPubSubHandler;
+	private RedisAsyncCommands<String, String> syncPubSubHandler;
 
 	private RedisClient redisClient;
     //private RedisPubSubAsyncCommands<String, String> asyncpublisher;
     private StatefulRedisPubSubConnection<String, String> connection;
-    private RedisPubSubAsyncCommands<String, String> handler;
+    private RedisAsyncCommands<String, String> handler;
 	
 	private String scefId = null;
 	
@@ -135,13 +135,13 @@ public class SCEF {
 		          + "\n\t\tDictionery file = " + dictionaryFile
 		          + "\n\t\tredis host = " + host + "\n\t\tredis port = " + port);
 		this.asyncDataConnector = new ConnectorImpl();
-		this.asyncHandler = (RedisStringAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
+		this.asyncHandler = (RedisAsyncCommands<String, String>)asyncDataConnector.createDatabase(AsyncDataConnector.class, host, port);
 
 		this.syncDataConnector = new ConnectorImpl();
-		this.syncHandler = (RedisStringCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
+		this.syncHandler = (RedisCommands<String, String>)syncDataConnector.createDatabase(SyncDataConnector.class, host, port);
 
 		this.asyncPubSubConnector = new PubSubConnectorImpl();
-		this.asyncPubSubHandler = (RedisPubSubAsyncCommands<String, String>)asyncPubSubConnector.createPubSub(AsyncPubSubConnector.class, host, port, this, channel);
+		this.asyncPubSubHandler = (RedisAsyncCommands<String, String>)asyncPubSubConnector.createPubSub(AsyncPubSubConnector.class, host, port, this, channel);
 		
 		//this.syncPubSubConnector = new PubSubConnectorImpl();
 		//this.syncPubSubHandler = (RedisPubSubCommands<String, String>)syncPubSubConnector.createPubSub(SyncPubSubConnector.class, host, port, this, channel);
@@ -405,9 +405,7 @@ public class SCEF {
 			List<GMonitoringEventConfig> l = new ArrayList<GMonitoringEventConfig>();
 			for (int j = 0; j < nextMap.length; j++) {
 				if (mapToDelete.contains(nextMap[j].getMonitoringType())) {
-				  SetArgs args = new SetArgs();
-				  args.ex(3);
-				  this.getSyncHandler().set(SCEF_REF_ID_PREFIX + nextMap[j].getScefRefId(), "", args);
+				  this.getSyncHandler().del(SCEF_REF_ID_PREFIX + nextMap[j].getScefRefId());
 				  if (logger.isInfoEnabled()) {
 				    logger.info("Removing SCEF Referancre ID : " + SCEF_REF_ID_PREFIX + nextMap[j].getScefRefId() 
 				        + " For Monitoring Type : " + nextMap[j].getMonitoringType());
@@ -540,35 +538,35 @@ public class SCEF {
 		this.asyncDataConnector = asyncDataConnector;
 	}
 
-	public RedisStringAsyncCommands<String, String> getAsyncHandler() {
+	public RedisAsyncCommands<String, String> getAsyncHandler() {
 		return asyncHandler;
 	}
 
-	public void setAsyncHandler(RedisStringAsyncCommands<String, String> asyncHandler) {
+	public void setAsyncHandler(RedisAsyncCommands<String, String> asyncHandler) {
 		this.asyncHandler = asyncHandler;
 	}
 
-	public RedisStringCommands<String, String> getSyncHandler() {
+	public RedisCommands<String, String> getSyncHandler() {
 		return syncHandler;
 	}
 
-	public void setSyncHandler(RedisStringCommands<String, String> syncHandler) {
+	public void setSyncHandler(RedisCommands<String, String> syncHandler) {
 		this.syncHandler = syncHandler;
 	}
 
-	public RedisPubSubAsyncCommands<String, String> getAsyncPubSubHandler() {
+	public RedisAsyncCommands<String, String> getAsyncPubSubHandler() {
 		return asyncPubSubHandler;
 	}
 
-	public void setAsyncPubSubHandler(RedisPubSubAsyncCommands<String, String> asyncPubSubHandler) {
+	public void setAsyncPubSubHandler(RedisAsyncCommands<String, String> asyncPubSubHandler) {
 		this.asyncPubSubHandler = asyncPubSubHandler;
 	}
 
-	public RedisPubSubCommands<String, String> getSyncPubSubHandler() {
+	public RedisAsyncCommands<String, String> getSyncPubSubHandler() {
 		return syncPubSubHandler;
 	}
 
-	public void setSyncPubSubHandler(RedisPubSubCommands<String, String> syncPubSubHandler) {
+	public void setSyncPubSubHandler(RedisAsyncCommands<String, String> syncPubSubHandler) {
 		this.syncPubSubHandler = syncPubSubHandler;
 	}
 
@@ -875,7 +873,7 @@ public class SCEF {
   public void handleT6aMO_DataRequestEvent(ServerT6aSession session, JMO_DataRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     if (logger.isInfoEnabled()) {
-      logger.info("Got MO Data Request (ODR) from MME");
+      //logger.info("Got MO Data Request (ODR) from MME");
     }
     AvpSet reqSet = request.getMessage().getAvps();
     
@@ -891,23 +889,20 @@ public class SCEF {
       
       Avp bearer = reqSet.getAvp(Avp.BEARER_IDENTIFIER);
       if (bearer == null) {
-        if (logger.isInfoEnabled()) {
-            logger.info("MO-Data-Request (ODR) missing the mandatory \"Bearer-Identifier\" parameter");
-        }
+        logger.error("MO-Data-Request (ODR) missing the mandatory \"Bearer-Identifier\" parameter");
         this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_INVALID_EPS_BEARER);
         return;
       }
 
       byte[] bearearIdentifier = bearer.getOctetString();
       String bearerString = new String(bearearIdentifier);
-      if (logger.isInfoEnabled()) {
-        logger.info("Bearer id = " + bearerString);
+      if (logger.isDebugEnabled()) {
+        logger.debug("Bearer id = " + bearerString);
       }
       
       //TODO  need to send data to application
       Avp niddData = reqSet.getAvp(Avp.NON_IP_DATA);
       String msg = niddData.getUTF8String();
-      logger.info("got message : \"" + msg + "\"");
 
       GUserIdentifier uid = UserIdentifier.extractFromAvpSingle(userIdentifier);
       String msisdn = uid.getMsisdn();
@@ -920,9 +915,14 @@ public class SCEF {
         this.t6aServer.sendODA(session, request, ResultCode.DIAMETER_ERROR_USER_UNKNOWN);
         return;
       }
+
+      this.t6aServer.sendODA(session, request, ResultCode.SUCCESS);
+
+      logger.info("got message : \"" + msg + "\"");
+
       GSCEFUserProfile userProfile =  new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
-      if (logger.isInfoEnabled()) {
-        logger.info("Send message to chanel : " + userProfile.getDataQueueAddress() + " for user " + userProfile.getExternalId());
+      if (logger.isDebugEnabled()) {
+        logger.debug("Send message to chanel : " + userProfile.getDataQueueAddress() + " for user " + userProfile.getExternalId());
       }
       this.handler.publish(userProfile.getDataQueueAddress(),
           new StringBuffer("1|").append(userProfile.getExternalId()).append("|").append(msg).toString());
@@ -931,7 +931,6 @@ public class SCEF {
       e.printStackTrace();
     }
     
-    this.t6aServer.sendODA(session, request, ResultCode.SUCCESS);
   }
 
   public void handleT6aMT_DataAnswertEvent(ServerT6aSession session, JMT_DataRequest request, JMT_DataAnswer answer)
@@ -957,13 +956,18 @@ public class SCEF {
 
       GSCEFUserProfile userProfile = new Gson().fromJson(new JsonParser().parse(data), GSCEFUserProfile.class);
 
-      Avp result = ansSet.getAvp(Avp.RESULT_CODE);
-      if (result != null && result.getUnsigned32() == ResultCode.SUCCESS) {
+      Avp resultAvp = ansSet.getAvp(Avp.RESULT_CODE);
+      int result = 0;
+      if (resultAvp != null && (result = (int)resultAvp.getUnsigned32()) == ResultCode.SUCCESS) {
         this.handler.publish(userProfile.getMonitoroingQueue(),
             new StringBuffer("3|").append(userProfile.getExternalId())
                 .append("|").append(message).toString());
       }
       else {
+        if (result == ResultCode.DIAMETER_ERROR_UNAUTHORIZED_REQUESTING_ENTITY) {
+          logger.info("Device is not active");
+          message = message + "|user is not Active";
+        }
         this.handler.publish(userProfile.getMonitoroingQueue(),
             new StringBuffer("2|").append(userProfile.getExternalId())
                 .append("|").append(message).toString());
