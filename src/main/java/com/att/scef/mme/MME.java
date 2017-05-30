@@ -254,11 +254,11 @@ public class MME {
            }
          });
       
-      long start = System.nanoTime();
+      long start = System.currentTimeMillis();
       for (int i = 0; i < retry; i++) {
-        this.t6aClient.sendODR(msisdn, msg);
+        this.t6aClient.sendODR(msisdn, msg+i);
       }
-      long end = (System.nanoTime() - start);
+      long end = (System.currentTimeMillis() - start);
 
       try {
         Thread.sleep(20000);
@@ -266,7 +266,7 @@ public class MME {
         e.printStackTrace();
       }
 
-      logger.info("Test for " + retry + " took : " + end + " nanoseconds. transactions per second = : " + end/retry);
+      logger.info("Test for " + retry + " took : " + end + " milisecondsseconds. transactions per second = : " + (end)/retry);
       
       
       int count = 0;
@@ -629,7 +629,7 @@ public class MME {
       logger.info("Got MO-Data-Answer (ODA)");
     }
     try {
-      long end = System.nanoTime();
+      long end = System.currentTimeMillis();
       AvpSet reqSet = request.getMessage().getAvps();
       AvpSet ansSet = answer.getMessage().getAvps();
 
@@ -637,7 +637,7 @@ public class MME {
       long start = Long.parseLong(this.syncHandler.get(sessionID));
       this.syncHandler.del(sessionID);
       //this.syncHandler.
-      end = (end - start)/1000000;
+      end = (end - start);
       Integer index = testResults.get(end);
 
       if (index != null) {

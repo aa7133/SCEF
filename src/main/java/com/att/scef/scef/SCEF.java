@@ -1042,7 +1042,7 @@ public class SCEF {
             }
 
             else {
-              message = new StringBuffer("0|").append(extId).append("|").append(9)
+              message = new StringBuffer("0|").append(extId).append("|").append(1)
                   .append("|UPPER_RATE_LIMIT=").append(uplinkRate).append("|DOWN_RATE_LIMIT=").append(uplinkRate)
                   .append("CONNECTION_ACTION_UPDATE with cmr").toString();
             }

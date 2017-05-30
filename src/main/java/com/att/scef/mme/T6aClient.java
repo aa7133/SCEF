@@ -193,7 +193,7 @@ public class T6aClient extends T6aAbstractClient {
       AvpSet reqSet = odr.getMessage().getAvps();
 
       String sessionID = "T" + reqSet.getAvp(Avp.SESSION_ID).getUTF8String();
-      String start = String.valueOf(System.nanoTime());
+      String start = String.valueOf(System.currentTimeMillis());
       
       this.syncHandler.set(sessionID, start);
       reqSet.addAvp(Avp.DESTINATION_HOST, this.getDestinationHost(), true);
