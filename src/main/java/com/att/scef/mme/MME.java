@@ -656,7 +656,7 @@ public class MME {
   public void handleMT_DataRequestEvent(ClientT6aSession session, JMT_DataRequest request)
       throws InternalException, IllegalDiameterStateException, RouteException, OverloadException {
     if (logger.isInfoEnabled()) {
-      logger.info("Got MO-Data-Answer (ODR)");
+      logger.info("Got MT-Data-Request (TDR)");
     }
     try {
       AvpSet reqSet = request.getMessage().getAvps();
@@ -699,7 +699,7 @@ public class MME {
       Avp bearer = reqSet.getAvp(Avp.BEARER_IDENTIFIER);
       if (bearer == null) {
         if (logger.isInfoEnabled()) {
-          logger.info("MO-Data-Request (ODR) missing the mandatory \"Bearer-Identifier\" parameter");
+          logger.info("MT-Data-Request (TDR) missing the mandatory \"Bearer-Identifier\" parameter");
         }
         this.t6aClient.sendTDA(session, request, ResultCode.DIAMETER_ERROR_INVALID_EPS_BEARER);
         return;

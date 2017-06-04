@@ -30,6 +30,7 @@ public class LoadTest {
     int port = 6379;
     String channel = "MME-Clients";
     int retry = 1000;
+    String user = "10";
     
     
     for (int i = 0; i < args.length; i += 2) {
@@ -48,12 +49,17 @@ public class LoadTest {
         else if (args[i].equals("--redis-channel")) {
           channel = args[i+1];
         }
+        else if (args[i].equals("--user")) {
+          user = args[i+1];
+        }
     }
-    new LoadTest(host, port, channel, retry);
+    new LoadTest(host, port, channel, retry, user);
     
   }
   
-  public LoadTest(String host, int port, String channel, int retry) {
+  public LoadTest(String host, int port, String channel, int retry, String user) {
+    logger.info("\n\t\tredis host = " + host + "\n\t\tredis port = " + port + "\n\tChannel = " 
+                       + channel + "\n\tRetry = " + retry + "\n\tUser = " + user);
     this.redisClient = RedisClient.create(RedisURI.Builder.redis(host, port).build());
     this.connection = this.redisClient.connectPubSub(); //RedisCommands();
     RedisPubSubListener<String, String> listener = new RedisPubSubListener<String, String>() {
@@ -110,7 +116,7 @@ public class LoadTest {
     Random r = new Random();
     
     StringBuilder sb = new StringBuilder();
-    String msg = sb.append("D|10|").append(r.nextInt(10000000)).toString();
+    String msg = sb.append("D|").append(user).append("|").append(r.nextInt(10000000)).toString();
     logger.info("Send messages to channel : " + channel);
     long start = System.currentTimeMillis();
     
