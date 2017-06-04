@@ -15,6 +15,7 @@ import org.jdiameter.api.Mode;
 import org.jdiameter.api.OverloadException;
 import org.jdiameter.api.ResultCode;
 import org.jdiameter.api.RouteException;
+import org.jdiameter.api.StatisticRecord;
 import org.jdiameter.api.app.AppAnswerEvent;
 import org.jdiameter.api.app.AppRequestEvent;
 import org.jdiameter.api.app.AppSession;
@@ -30,6 +31,9 @@ import org.jdiameter.api.t6a.events.JConnectionManagementRequest;
 import org.jdiameter.api.t6a.events.JMO_DataRequest;
 import org.jdiameter.api.t6a.events.JMT_DataAnswer;
 import org.jdiameter.api.t6a.events.JMT_DataRequest;
+import org.jdiameter.common.api.statistic.IStatistic;
+import org.jdiameter.common.api.statistic.IStatisticRecord;
+import org.jdiameter.common.impl.statistic.StatisticManagerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,6 +182,13 @@ public class SCEF {
 
 		
 		logger.info("=================================== SCEF started ==============================");
+		
+		StatisticManagerImpl stat = this.s6tClient.getStatisticsManager();
+		for (IStatistic s :  stat.getStatistic()) {
+		  for (StatisticRecord r : s.getRecords()) {
+		    logger.info("Statistic record name = " + r.getName() + " Description : " +r.getDescription());
+		  }
+		}
 	}
 	  
   private void handleMmeMessages(String channel, String message) {

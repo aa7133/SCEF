@@ -45,7 +45,7 @@ import org.jdiameter.api.Stack;
 import org.jdiameter.api.app.AppSession;
 import org.jdiameter.api.app.StateChangeListener;
 import org.jdiameter.client.api.ISessionFactory;
-
+import org.jdiameter.common.impl.statistic.StatisticManagerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
   private String remoteRealm = null;
   private String[] peers = null;
   private String destinationHost;
-  
+  private StatisticManagerImpl statistics;
   protected ApplicationId applicationId;
 
   public void init(InputStream configStream, String clientID, ApplicationId appId) throws Exception {
@@ -71,6 +71,7 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
     stack.init(configStream, this, this, clientID, true, appId); // lets always pass
     this.sessionFactory = (ISessionFactory) this.stack.getSessionFactory();
     Configuration config = stack.getMetaData().getConfiguration();
+    this.statistics = new StatisticManagerImpl(config);
     Configuration[] realmTable = config.getChildren(RealmTable.ordinal());
     for (Configuration t : realmTable) {
       for (Configuration e : t.getChildren(RealmEntry.ordinal())) {
@@ -85,6 +86,10 @@ public abstract class TBase implements EventListener<Request, Answer>, NetworkRe
       logger.info("Peer = " + peers[i]);
     }
     destinationHost = peers[0];
+  }
+
+  public StatisticManagerImpl getStatisticsManager() {
+    return this.statistics;
   }
 
   public void updateAnswer(Message req, Message ans, int resultCode) {
